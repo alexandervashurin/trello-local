@@ -58,13 +58,17 @@ pub struct UpdateList { pub title: String }
 
 #[derive(Deserialize)]
 pub struct CreateCard { pub title: String, pub content: Option<String> }
+
 #[derive(Deserialize)]
 pub struct UpdateCard {
-    pub title: String,
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
     pub content: Option<String>,
     #[serde(default)]
     pub list_id: Option<i64>,
     #[serde(default)]
     pub position: Option<f64>,
-    pub done: bool,
+    #[serde(default)]
+    pub done: Option<bool>,  // ← теперь Option<bool>
 }

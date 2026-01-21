@@ -7,7 +7,7 @@ pub async fn create_card(
     Json(payload): Json<CreateCard>,
 ) -> Result<Json<Card>, (StatusCode, String)> {
     let card_row = sqlx::query_as::<_, CardRow>(
-        "INSERT INTO cards (list_id, title, content) VALUES (?, ?, ?) RETURNING id, list_id, title, content, position",
+        "INSERT INTO cards (list_id, title, content, done) VALUES (?, ?, ?, 0) RETURNING id, list_id, title, content, position, done",
     )
     .bind(list_id)
     .bind(&payload.title)

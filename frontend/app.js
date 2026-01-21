@@ -286,9 +286,16 @@ async function handleDrop(e) {
   const cardId = draggedCard.dataset.cardId;
   if (targetListId === draggedFromList) return;
   try {
-    await fetch(`/api/cards/${cardId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ list_id: parseInt(targetListId), title: "" }) });
+    await fetch(`/api/cards/${cardId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ list_id: parseInt(targetListId) }) // ← исправлено!
+    });
     loadBoards();
-  } catch (e) { console.error(e); alert('Ошибка перемещения карточки'); }
+  } catch (e) {
+    console.error(e);
+    alert('Ошибка перемещения карточки');
+  }
 }
 
 // === Init ===
