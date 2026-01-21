@@ -66,4 +66,5 @@ pub struct UpdateCard {
     pub list_id: Option<i64>,
     #[serde(default)]
     pub position: Option<f64>,
+    pub done: Option<bool>,
 }

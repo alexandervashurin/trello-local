@@ -36,7 +36,7 @@ async function loadBoards() {
                        ondblclick="editCard(${card.id}, \`${card.title.replace(/`/g, '\\`')}\`, ${card.content ? `\`${card.content.replace(/`/g, '\\`')}\`` : 'null'})">
                     <div style="display:flex; justify-content:space-between; align-items:start;">
                       <div>
-                        <strong>${card.title}</strong>
+                        <strong style="text-decoration:${card.done ? 'line-through' : 'none'}">${card.title}</strong>
                         ${card.content ? `<p>${card.content}</p>` : ''}
                       </div>
                       <button class="btn btn-secondary" onclick="deleteCard(${card.id})" style="padding:2px 6px;font-size:10px;">🗑️</button>
