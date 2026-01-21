@@ -179,19 +179,56 @@ function cancelAddCard(listId) {
 function editCard(cardId, title, content) {
   const cardEl = document.querySelector(`.card[data-card-id="${cardId}"]`);
   if (!cardEl) return;
+
+  // Сохраняем оригинальный HTML (без изменений)
   const originalHTML = cardEl.innerHTML;
-  const formHTML = `
-    <div class="add-list-form">
-      <input type="text" class="add-list-input" value="${title.replace(/"/g, '&quot;')}" maxlength="100">
-      <textarea class="add-list-input" rows="2" style="margin-top:5px;">${content || ''}</textarea>
-      <div class="add-list-btns">
-        <button class="btn btn-primary" onclick="saveCardEdit(${cardId}, this)">Сохранить</button>
-        <button class="btn btn-secondary" onclick="cancelCardEdit(${cardId}, \`${originalHTML.replace(/`/g, '\\`')}\`)">Отмена</button>
-      </div>
-    </div>
-  `;
-  cardEl.innerHTML = formHTML;
-  cardEl.querySelector('input').focus();
+
+  // Создаём новую форму через DOM
+  const formDiv = document.createElement('div');
+  formDiv.className = 'add-list-form';
+
+  // Input
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'add-list-input';
+  input.value = title;
+  input.maxLength = 100;
+
+  // Textarea
+  const textarea = document.createElement('textarea');
+  textarea.className = 'add-list-input';
+  textarea.rows = 2;
+  textarea.style.marginTop = '5px';
+  textarea.value = content || '';
+
+  // Кнопки
+  const btnsDiv = document.createElement('div');
+  btnsDiv.className = 'add-list-btns';
+
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'btn btn-primary';
+  saveBtn.textContent = 'Сохранить';
+  saveBtn.onclick = () => saveCardEdit(cardId, saveBtn);
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'btn btn-secondary';
+  cancelBtn.textContent = 'Отмена';
+  cancelBtn.onclick = () => cancelCardEdit(cardId, originalHTML);
+
+  btnsDiv.appendChild(saveBtn);
+  btnsDiv.appendChild(cancelBtn);
+
+  // Собираем форму
+  formDiv.appendChild(input);
+  formDiv.appendChild(textarea);
+  formDiv.appendChild(btnsDiv);
+
+  // Заменяем содержимое карточки
+  cardEl.innerHTML = '';
+  cardEl.appendChild(formDiv);
+
+  // Фокус на поле ввода
+  input.focus();
 }
 
 async function saveCardEdit(cardId, button) {
@@ -209,7 +246,13 @@ async function saveCardEdit(cardId, button) {
 
 function cancelCardEdit(cardId, originalHTML) {
   const cardEl = document.querySelector(`.card[data-card-id="${cardId}"]`);
-  if (cardEl) cardEl.innerHTML = originalHTML;
+  if (cardEl) {
+    // Просто вставляем оригинальный HTML
+    cardEl.innerHTML = originalHTML;
+    // Восстанавливаем обработчик двойного клика
+    cardEl.ondblclick = () => editCard(cardId, cardEl.querySelector('strong').textContent, 
+                                      cardEl.querySelector('p')?.textContent || null);
+  }
 }
 
 // === Drag-and-Drop ===

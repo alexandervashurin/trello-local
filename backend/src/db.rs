@@ -27,6 +27,7 @@ pub async fn connect() -> Result<SqlitePool, sqlx::Error> {
             title TEXT NOT NULL,
             content TEXT,
             position REAL NOT NULL DEFAULT 0,
+            done BOOLEAN NOT NULL DEFAULT 0,
             FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE
         );
         "#

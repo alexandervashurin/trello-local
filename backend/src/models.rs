@@ -21,6 +21,7 @@ pub struct CardRow {
     pub title: String,
     pub content: Option<String>,
     pub position: f64,
+    pub done: bool,
 }
 
 #[derive(Serialize)]
@@ -28,6 +29,7 @@ pub struct Card {
     pub id: i64,
     pub title: String,
     pub content: Option<String>,
+    pub done: bool,
 }
 
 #[derive(Serialize)]
