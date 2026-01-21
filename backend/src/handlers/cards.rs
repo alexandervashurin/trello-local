@@ -20,6 +20,7 @@ pub async fn create_card(
         id: card_row.id,
         title: card_row.title,
         content: card_row.content,
+        done: card_row.done,  // ← новое
     };
 
     Ok(Json(card))
@@ -46,7 +47,7 @@ pub async fn update_card(
     let new_content = payload.content.or(current.content);
     let new_list_id = payload.list_id.unwrap_or(current.list_id);
     let new_position = payload.position.unwrap_or(current.position);
-    let new_done = payload.done.unwrap_or(current.done);  // ← новое
+    let new_done = payload.done;  // ← просто берем значение
 
     let updated: CardRow = sqlx::query_as(
         "UPDATE cards SET title = ?, content = ?, list_id = ?, position = ?, done = ? WHERE id = ? RETURNING *"
@@ -55,7 +56,7 @@ pub async fn update_card(
     .bind(new_content)
     .bind(new_list_id)
     .bind(new_position)
-    .bind(new_done)  // ← новое
+    .bind(new_done)
     .bind(id)
     .fetch_one(&pool)
     .await
@@ -65,7 +66,7 @@ pub async fn update_card(
         id: updated.id,
         title: updated.title,
         content: updated.content,
-        done: updated.done,  // ← новое
+        done: updated.done,
     };
 
     Ok(Json(card))

@@ -35,6 +35,7 @@ pub async fn get_boards(
                     id: c.id,
                     title: c.title,
                     content: c.content,
+                    done: c.done,
                 })
                 .collect();
 

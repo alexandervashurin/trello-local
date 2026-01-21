@@ -1,3 +1,5 @@
+// frontend/app.js
+
 let draggedCard = null;
 let draggedFromList = null;
 
@@ -36,7 +38,10 @@ async function loadBoards() {
                        ondblclick="editCard(${card.id}, \`${card.title.replace(/`/g, '\\`')}\`, ${card.content ? `\`${card.content.replace(/`/g, '\\`')}\`` : 'null'})">
                     <div style="display:flex; justify-content:space-between; align-items:start;">
                       <div>
-                        <strong style="text-decoration:${card.done ? 'line-through' : 'none'}">${card.title}</strong>
+                        <label style="display:flex; align-items:center; gap:6px;">
+                          <input type="checkbox" ${card.done ? 'checked' : ''} onchange="toggleCardDone(${card.id}, this.checked)">
+                          <strong style="text-decoration:${card.done ? 'line-through' : 'none'}">${card.title}</strong>
+                        </label>
                         ${card.content ? `<p>${card.content}</p>` : ''}
                       </div>
                       <button class="btn btn-secondary" onclick="deleteCard(${card.id})" style="padding:2px 6px;font-size:10px;">🗑️</button>
@@ -56,6 +61,7 @@ async function loadBoards() {
       </div>
     `).join('');
 
+    // Назначаем drag-обработчики
     document.querySelectorAll('.card').forEach(card => {
       card.addEventListener('dragstart', handleDragStart);
       card.addEventListener('dragend', handleDragEnd);
@@ -179,29 +185,22 @@ function cancelAddCard(listId) {
 function editCard(cardId, title, content) {
   const cardEl = document.querySelector(`.card[data-card-id="${cardId}"]`);
   if (!cardEl) return;
-
-  // Сохраняем оригинальный HTML (без изменений)
   const originalHTML = cardEl.innerHTML;
-
-  // Создаём новую форму через DOM
   const formDiv = document.createElement('div');
   formDiv.className = 'add-list-form';
 
-  // Input
   const input = document.createElement('input');
   input.type = 'text';
   input.className = 'add-list-input';
   input.value = title;
   input.maxLength = 100;
 
-  // Textarea
   const textarea = document.createElement('textarea');
   textarea.className = 'add-list-input';
   textarea.rows = 2;
   textarea.style.marginTop = '5px';
   textarea.value = content || '';
 
-  // Кнопки
   const btnsDiv = document.createElement('div');
   btnsDiv.className = 'add-list-btns';
 
@@ -218,16 +217,12 @@ function editCard(cardId, title, content) {
   btnsDiv.appendChild(saveBtn);
   btnsDiv.appendChild(cancelBtn);
 
-  // Собираем форму
   formDiv.appendChild(input);
   formDiv.appendChild(textarea);
   formDiv.appendChild(btnsDiv);
 
-  // Заменяем содержимое карточки
   cardEl.innerHTML = '';
   cardEl.appendChild(formDiv);
-
-  // Фокус на поле ввода
   input.focus();
 }
 
@@ -246,12 +241,27 @@ async function saveCardEdit(cardId, button) {
 
 function cancelCardEdit(cardId, originalHTML) {
   const cardEl = document.querySelector(`.card[data-card-id="${cardId}"]`);
-  if (cardEl) {
-    // Просто вставляем оригинальный HTML
-    cardEl.innerHTML = originalHTML;
-    // Восстанавливаем обработчик двойного клика
-    cardEl.ondblclick = () => editCard(cardId, cardEl.querySelector('strong').textContent, 
-                                      cardEl.querySelector('p')?.textContent || null);
+  if (cardEl) cardEl.innerHTML = originalHTML;
+}
+
+// === Toggle Done ===
+async function toggleCardDone(cardId, done) {
+  try {
+    const res = await fetch(`/api/cards/${cardId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ done })
+    });
+    if (!res.ok) {
+      alert('Не удалось обновить статус');
+      document.querySelector(`.card[data-card-id="${cardId}"] input[type="checkbox"]`).checked = !done;
+    } else {
+      loadBoards(); // перезагружаем всё для простоты
+    }
+  } catch (e) {
+    console.error(e);
+    alert('Ошибка подключения');
+    document.querySelector(`.card[data-card-id="${cardId}"] input[type="checkbox"]`).checked = !done;
   }
 }
 
@@ -284,7 +294,7 @@ async function handleDrop(e) {
 // === Init ===
 loadBoards();
 
-// === Make functions global for onclick ===
+// === Экспорт функций для onclick ===
 window.deleteBoard = deleteBoard;
 window.deleteList = deleteList;
 window.deleteCard = deleteCard;
@@ -297,3 +307,4 @@ window.createCard = createCard;
 window.cancelAddCard = cancelAddCard;
 window.saveCardEdit = saveCardEdit;
 window.cancelCardEdit = cancelCardEdit;
+window.toggleCardDone = toggleCardDone;
