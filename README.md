@@ -38,5 +38,6 @@ cd trello-local
 cargo build --release
 cargo run --manifest-path backend/Cargo.toml
 http://<IP-адрес-вашего-сервера>:8080
+```
 
 
