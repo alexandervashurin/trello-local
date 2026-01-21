@@ -31,6 +31,7 @@ pub async fn update_card(
     State(pool): State<sqlx::SqlitePool>,
     Json(payload): Json<UpdateCard>,
 ) -> Result<Json<Card>, (StatusCode, String)> {
+    // 1. Получаем текущую карточку из БД
     let current: CardRow = sqlx::query_as::<_, CardRow>("SELECT * FROM cards WHERE id = ?")
         .bind(id)
         .fetch_one(&pool)
@@ -43,12 +44,14 @@ pub async fn update_card(
             }
         })?;
 
-    let new_title = if payload.title.is_empty() { current.title } else { payload.title };
+    // 2. Формируем новые значения: используем payload, если указано, иначе — старые
+    let new_title = payload.title.unwrap_or(current.title);
     let new_content = payload.content.or(current.content);
     let new_list_id = payload.list_id.unwrap_or(current.list_id);
     let new_position = payload.position.unwrap_or(current.position);
-    let new_done = payload.done;  // ← просто берем значение
+    let new_done = payload.done.unwrap_or(current.done);
 
+    // 3. Обновляем запись в БД и возвращаем изменённую строку
     let updated: CardRow = sqlx::query_as(
         "UPDATE cards SET title = ?, content = ?, list_id = ?, position = ?, done = ? WHERE id = ? RETURNING *"
     )
@@ -62,6 +65,7 @@ pub async fn update_card(
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
+    // 4. Формируем ответ — только нужные поля
     let card = Card {
         id: updated.id,
         title: updated.title,
@@ -69,8 +73,10 @@ pub async fn update_card(
         done: updated.done,
     };
 
+    // 5. Возвращаем успешный ответ
     Ok(Json(card))
 }
+
 
 pub async fn delete_card(
     Path(id): Path<i64>,
