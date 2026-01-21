@@ -38,6 +38,3 @@
 git clone https://github.com/alexandervashurin/trello-local.git
 cd trello-local
 
----
-
-### 2. Соберите бэкенд
