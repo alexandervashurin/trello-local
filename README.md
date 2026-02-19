@@ -16,6 +16,8 @@
 - ✅ **Резервное копирование**: Python-скрипт для бэкапов
 - ✅ **Многоуровневая структура**: доски → списки → карточки
 - 🌐 **Доступ из любой точки локальной сети**
+- 👥 **Общие доски**: делитесь досками с другими пользователями
+- 🔐 **Управление участниками**: назначайте роли и контролируйте доступ
 
 ---
 
@@ -53,7 +55,62 @@ python3 backup.py
 0 */6 * * * cd /путь/к/trello-local && python3 backup.py
 ```
 
-### 3. 📂 Структура проекта
+### 3. 👥 Работа с пользователями и общими досками
+
+#### Создание пользователей
+
+```bash
+# Создать первого пользователя
+curl -X POST http://localhost:8080/api/users \
+  -H "Content-Type: application/json" \
+  -d '{"username":"alice"}'
+
+# Создать второго пользователя
+curl -X POST http://localhost:8080/api/users \
+  -H "Content-Type: application/json" \
+  -d '{"username":"bob"}'
+
+# Получить список всех пользователей
+curl http://localhost:8080/api/users
+```
+
+#### Создание общих досок
+
+```bash
+# Создать личную доску (is_shared: false)
+curl -X POST http://localhost:8080/api/boards \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Мои задачи","is_shared":false}'
+
+# Создать общую доску для команды
+curl -X POST http://localhost:8080/api/boards \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Команда разработки","is_shared":true}'
+```
+
+#### Управление участниками доски
+
+```bash
+# Добавить участника на доску (роль: member или owner)
+curl -X POST http://localhost:8080/api/boards/1/members \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":2,"role":"member"}'
+
+# Получить список участников доски
+curl http://localhost:8080/api/boards/1/members
+
+# Удалить участника из доски
+curl -X DELETE http://localhost:8080/api/boards/1/members/2
+```
+
+#### Получение досок пользователя
+
+```bash
+# Получить все доски пользователя (его собственные + общие)
+curl http://localhost:8080/api/users/1/boards
+```
+
+### 4. 📂 Структура проекта
 ```
 trello-local/
 ├── data/                # База данных SQLite
@@ -68,7 +125,8 @@ trello-local/
 ├── backup.py            # Скрипт резервного копирования
 └── README.md            # Этот файл
 ```
-### 4. 🔧 Ручная настройка (для разработки)
+
+### 5. 🔧 Ручная настройка (для разработки)
 ## Установка зависимостей
 
 ```bash
@@ -79,13 +137,15 @@ cargo install sqlx-cli --no-default-features --features rustls,sqlite
 # Для Python
 pip3 install requests
 ```
+
 ## Сборка в режиме разработки
 
 ```bash
 cd backend
 cargo run
 ```
-### ❓ Частые вопросы
+
+### 6. ❓ Частые вопросы
 ## Почему приложение не запускается?
 Убедитесь, что папка ```data/``` существует: ```mkdir -p data```
 Проверьте права на запись: ```chmod -R u+rw data/```
@@ -96,7 +156,7 @@ cargo run
 Пересоберите: ```cargo build --release```
 Запустите заново
 
-## Можно ли использовать на Windows?
+## 7. Можно ли использовать на Windows?
 Не собирал не пробовал, пробуйте!
 
 ### 📜 Лицензия

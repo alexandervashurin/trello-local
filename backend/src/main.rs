@@ -4,7 +4,7 @@ mod models;
 mod handlers;
 
 use axum::{
-    routing::{get, post, patch},
+    routing::{get, post, patch, delete},
     Router,
 };
 use std::net::SocketAddr;
@@ -16,10 +16,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pool = db::connect().await?;
 
     let app = Router::new()
+        // Пользователи
+        .route("/api/users", get(handlers::users::get_users).post(handlers::users::create_user))
+        .route("/api/users/:id", get(handlers::users::get_user))
+        // Доски
         .route("/api/boards", get(handlers::boards::get_boards).post(handlers::boards::create_board))
         .route("/api/boards/:id", patch(handlers::boards::update_board).delete(handlers::boards::delete_board))
+        .route("/api/boards/:board_id/members", get(handlers::boards::get_board_members).post(handlers::boards::add_board_member))
+        .route("/api/boards/:board_id/members/:user_id", delete(handlers::boards::remove_board_member))
+        .route("/api/users/:user_id/boards", get(handlers::boards::get_boards_for_user))
+        // Списки
         .route("/api/boards/:board_id/lists", post(handlers::lists::create_list))
         .route("/api/lists/:id", patch(handlers::lists::update_list).delete(handlers::lists::delete_list))
+        // Карточки
         .route("/api/lists/:list_id/cards", post(handlers::cards::create_card))
         .route("/api/cards/:id", patch(handlers::cards::update_card).delete(handlers::cards::delete_card))
         .fallback_service(

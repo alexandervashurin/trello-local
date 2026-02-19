@@ -1,9 +1,27 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, sqlx::FromRow)]
+pub struct User {
+    pub id: i64,
+    pub username: String,
+    pub created_at: i64,
+}
+
+#[derive(Serialize, sqlx::FromRow)]
 pub struct Board {
     pub id: i64,
     pub title: String,
+    pub owner_id: i64,
+    pub is_shared: bool,
+}
+
+#[derive(Serialize)]
+pub struct BoardWithMembers {
+    pub id: i64,
+    pub title: String,
+    pub owner_id: i64,
+    pub is_shared: bool,
+    pub members: Vec<User>,
 }
 
 #[derive(Serialize, sqlx::FromRow)]
@@ -32,24 +50,31 @@ pub struct Card {
     pub done: bool,
 }
 
-#[derive(Serialize)]
-pub struct BoardWithLists {
-    pub id: i64,
+#[derive(Deserialize)]
+pub struct CreateBoard {
     pub title: String,
-    pub lists: Vec<ListWithCards>,
-}
-
-#[derive(Serialize)]
-pub struct ListWithCards {
-    pub id: i64,
-    pub title: String,
-    pub cards: Vec<Card>,
+    #[serde(default)]
+    pub is_shared: bool,
 }
 
 #[derive(Deserialize)]
-pub struct CreateBoard { pub title: String }
+pub struct UpdateBoard {
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub is_shared: Option<bool>,
+}
+
 #[derive(Deserialize)]
-pub struct UpdateBoard { pub title: String }
+pub struct AddBoardMember {
+    pub user_id: i64,
+    #[serde(default = "default_role")]
+    pub role: String,
+}
+
+fn default_role() -> String {
+    "member".to_string()
+}
 
 #[derive(Deserialize)]
 pub struct CreateList { pub title: String }
