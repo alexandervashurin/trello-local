@@ -1,4 +1,4 @@
-use axum::{extract::{Path, State}, http::StatusCode, Json};
+use axum::{extract::{Path, State, Query}, http::StatusCode, Json};
 use crate::models::User;
 use serde::Deserialize;
 
@@ -7,13 +7,28 @@ pub struct CreateUser {
     pub username: String,
 }
 
+#[derive(Deserialize)]
+pub struct GetUserQuery {
+    username: Option<String>,
+}
+
 pub async fn get_users(
     State(pool): State<sqlx::SqlitePool>,
+    query: Query<GetUserQuery>,
 ) -> Result<Json<Vec<User>>, (StatusCode, String)> {
-    let users: Vec<User> = sqlx::query_as("SELECT * FROM users ORDER BY id")
-        .fetch_all(&pool)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let users: Vec<User> = if let Some(username) = &query.username {
+        // Поиск по имени
+        sqlx::query_as("SELECT id, username, created_at FROM users WHERE username = ? ORDER BY id")
+            .bind(username)
+            .fetch_all(&pool)
+            .await
+    } else {
+        // Все пользователи
+        sqlx::query_as("SELECT id, username, created_at FROM users ORDER BY id")
+            .fetch_all(&pool)
+            .await
+    }
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     Ok(Json(users))
 }

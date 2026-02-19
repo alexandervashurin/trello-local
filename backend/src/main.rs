@@ -1,7 +1,7 @@
 // backend/src/main.rs
-mod db;
-mod models;
-mod handlers;
+pub mod db;
+pub mod models;
+pub mod handlers;
 
 use axum::{
     routing::{get, post, patch, delete},
@@ -16,7 +16,15 @@ use tower_http::services::{ServeDir, ServeFile};
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pool = db::connect().await?;
 
+    // Абсолютные пути для frontend
+    let frontend_dir = "/opt/trello-local/frontend";
+    let index_html = "/opt/trello-local/frontend/index.html";
+    let login_html = "/opt/trello-local/frontend/login.html";
+
     let app = Router::new()
+        // Auth
+        .route("/api/auth/register", post(handlers::auth::register))
+        .route("/api/auth/login", post(handlers::auth::login))
         // Пользователи
         .route("/api/users", get(handlers::users::get_users).post(handlers::users::create_user))
         .route("/api/users/:id", get(handlers::users::get_user))
@@ -32,9 +40,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Карточки
         .route("/api/lists/:list_id/cards", post(handlers::cards::create_card))
         .route("/api/cards/:id", patch(handlers::cards::update_card).delete(handlers::cards::delete_card))
+        // Страницы
+        .nest_service("/login.html", ServeFile::new(login_html))
         .fallback_service(
-            ServeDir::new("frontend")
-                .fallback(ServeFile::new("../frontend/index.html"))
+            ServeDir::new(frontend_dir)
+                .fallback(ServeFile::new(index_html))
         )
         .with_state(pool);
 

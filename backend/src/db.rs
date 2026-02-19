@@ -2,8 +2,8 @@ use sqlx::SqlitePool;
 use std::path::PathBuf;
 
 pub async fn connect() -> Result<SqlitePool, Box<dyn std::error::Error>> {
-    // Используем абсолютный путь относительно рабочей директории
-    let db_path = PathBuf::from("./data/trello.db");
+    // Жёстко заданный путь для установки в /opt/trello-local
+    let db_path = PathBuf::from("/opt/trello-local/backend/data/trello.db");
 
     // Создаём директорию, если не существует
     if let Some(parent) = db_path.parent() {
@@ -21,6 +21,7 @@ pub async fn connect() -> Result<SqlitePool, Box<dyn std::error::Error>> {
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL UNIQUE,
+            password_hash TEXT,
             created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
         );
         CREATE TABLE IF NOT EXISTS boards (
@@ -59,9 +60,29 @@ pub async fn connect() -> Result<SqlitePool, Box<dyn std::error::Error>> {
     .execute(&pool)
     .await?;
 
+    // Добавляем колонку password_hash если её нет (для существующих БД)
+    sqlx::query("ALTER TABLE users ADD COLUMN password_hash TEXT")
+        .execute(&pool)
+        .await
+        .ok(); // Игнорируем ошибку если колонка уже есть
+
     // Создаём пользователя по умолчанию
     sqlx::query(
         "INSERT OR IGNORE INTO users (id, username, created_at) VALUES (1, 'default', strftime('%s', 'now'))",
+    )
+    .execute(&pool)
+    .await?;
+
+    // Создаём тестовую доску для пользователя
+    sqlx::query(
+        "INSERT OR IGNORE INTO boards (id, title, owner_id, is_shared) VALUES (1, 'Моя первая доска', 1, 0)",
+    )
+    .execute(&pool)
+    .await?;
+
+    // Добавляем пользователя как владельца доски
+    sqlx::query(
+        "INSERT OR IGNORE INTO board_members (board_id, user_id, role) VALUES (1, 1, 'owner')",
     )
     .execute(&pool)
     .await?;

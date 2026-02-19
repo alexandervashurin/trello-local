@@ -8,6 +8,14 @@ pub struct User {
 }
 
 #[derive(Serialize, sqlx::FromRow)]
+pub struct UserWithPassword {
+    pub id: i64,
+    pub username: String,
+    pub password_hash: String,
+    pub created_at: i64,
+}
+
+#[derive(Serialize, sqlx::FromRow)]
 pub struct Board {
     pub id: i64,
     pub title: String,
@@ -53,6 +61,7 @@ pub struct CardRow {
 #[derive(Serialize, sqlx::FromRow)]
 pub struct Card {
     pub id: i64,
+    pub list_id: i64,
     pub title: String,
     pub content: Option<String>,
     pub done: bool,
@@ -103,5 +112,32 @@ pub struct UpdateCard {
     #[serde(default)]
     pub position: Option<f64>,
     #[serde(default)]
-    pub done: Option<bool>,  // ← теперь Option<bool>
+    pub done: Option<bool>,
+}
+
+// Auth модели
+#[derive(Deserialize)]
+pub struct RegisterUser {
+    pub username: String,
+    pub password: String,
+}
+
+#[derive(Deserialize)]
+pub struct LoginUser {
+    pub username: String,
+    pub password: String,
+}
+
+#[derive(Serialize)]
+pub struct AuthToken {
+    pub token: String,
+    pub user_id: i64,
+    pub username: String,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Claims {
+    pub user_id: i64,
+    pub username: String,
+    pub exp: usize,
 }

@@ -1,13 +1,28 @@
-use axum::{extract::{Path, State}, http::StatusCode, Json};
+use axum::{extract::{Path, State, Query}, http::StatusCode, Json};
 use crate::models::{Board, BoardWithMembers, User, CreateBoard, UpdateBoard, AddBoardMember, ListWithCards, Card};
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+pub struct GetBoardsQuery {
+    search: Option<String>,
+}
 
 pub async fn get_boards(
     State(pool): State<sqlx::SqlitePool>,
+    query: Query<GetBoardsQuery>,
 ) -> Result<Json<Vec<BoardWithMembers>>, (StatusCode, String)> {
-    let boards: Vec<Board> = sqlx::query_as("SELECT * FROM boards ORDER BY id")
-        .fetch_all(&pool)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let boards: Vec<Board> = if let Some(search) = &query.search {
+        // Поиск по названию доски
+        sqlx::query_as("SELECT * FROM boards WHERE title LIKE ? ORDER BY id")
+            .bind(format!("%{}%", search))
+            .fetch_all(&pool)
+            .await
+    } else {
+        sqlx::query_as("SELECT * FROM boards ORDER BY id")
+            .fetch_all(&pool)
+            .await
+    }
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let mut result = Vec::new();
     for board in boards {
@@ -36,7 +51,7 @@ pub async fn get_boards(
         let mut lists = Vec::new();
         for list in lists_rows {
             let cards: Vec<Card> = sqlx::query_as(
-                "SELECT id, title, content, done FROM cards WHERE list_id = ? ORDER BY position, id",
+                "SELECT id, list_id, title, content, done FROM cards WHERE list_id = ? ORDER BY position, id",
             )
             .bind(list.id)
             .fetch_all(&pool)
@@ -104,7 +119,7 @@ pub async fn get_boards_for_user(
         let mut lists = Vec::new();
         for list in lists_rows {
             let cards: Vec<Card> = sqlx::query_as(
-                "SELECT id, title, content, done FROM cards WHERE list_id = ? ORDER BY position, id",
+                "SELECT id, list_id, title, content, done FROM cards WHERE list_id = ? ORDER BY position, id",
             )
             .bind(list.id)
             .fetch_all(&pool)

@@ -5,13 +5,67 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Trello Local</title>
   <link rel="stylesheet" href="style.css">
+  <style>
+    .user-menu {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .user-menu span {
+      font-size: 14px;
+      color: #666;
+    }
+    .user-menu button {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+  </style>
 </head>
 <body>
   <div class="header">
     <h1>Мои доски</h1>
+    <div class="user-menu">
+      <span id="current-user"></span>
+      <button class="btn btn-secondary" onclick="logout()" id="logout-btn" style="display:none;">🚪 Выйти</button>
+    </div>
+    <input type="text" id="search-input" placeholder="🔍 Поиск..." style="padding:8px 12px;border:1px solid #ccc;border-radius:4px;font-size:14px;width:200px;">
     <button class="create-board-btn" id="create-board-btn">➕ Новая доска</button>
   </div>
   <div id="boards"></div>
+
+  <!-- Модальное окно участников -->
+  <div id="members-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;">
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:20px;border-radius:8px;min-width:300px;max-width:500px;">
+      <h2 style="margin-top:0;">Участники доски</h2>
+      <div id="members-list" style="margin:15px 0;max-height:300px;overflow-y:auto;"></div>
+      <div style="margin-top:15px;">
+        <input type="text" id="new-member-username" placeholder="Имя пользователя" style="padding:8px;border:1px solid #ccc;border-radius:4px;width:60%;">
+        <button class="btn btn-primary" onclick="addMember()" style="margin-left:5px;">Добавить</button>
+      </div>
+      <div style="margin-top:20px;text-align:right;">
+        <button class="btn btn-secondary" onclick="closeMembersModal()">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Проверка авторизации при загрузке
+    const token = localStorage.getItem('token');
+    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    
+    if (!token || !user) {
+      window.location.href = '/login.html';
+    } else {
+      document.getElementById('current-user').textContent = '👤 ' + user.username;
+      document.getElementById('logout-btn').style.display = 'block';
+    }
+    
+    function logout() {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login.html';
+    }
+  </script>
 
   <script src="app.js"></script>
 </body>

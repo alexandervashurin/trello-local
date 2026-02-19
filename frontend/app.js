@@ -2,17 +2,30 @@
 
 let draggedCard = null;
 let draggedFromList = null;
+let searchQuery = '';
 
 const boardsContainer = document.getElementById('boards');
 const createBoardBtn = document.getElementById('create-board-btn');
+const searchInput = document.getElementById('search-input');
 
 if (createBoardBtn) {
   createBoardBtn.addEventListener('click', createBoard);
 }
 
+if (searchInput) {
+  searchInput.addEventListener('input', (e) => {
+    searchQuery = e.target.value.trim();
+    loadBoards();
+  });
+}
+
 async function loadBoards() {
   try {
-    const res = await fetch('/api/boards');
+    const url = searchQuery 
+      ? `/api/boards?search=${encodeURIComponent(searchQuery)}`
+      : '/api/boards';
+    
+    const res = await fetch(url);
     if (!res.ok) throw new Error('Ошибка загрузки');
     const boards = await res.json();
     
@@ -25,6 +38,7 @@ async function loadBoards() {
           </div>
           <div style="display:flex; gap:8px; align-items:center;">
             <span style="font-size:12px;color:#666;" title="Участники">👥 ${board.members.length}</span>
+            <button class="btn btn-secondary" onclick="openMembersModal(${board.id})" style="padding:4px 8px;font-size:12px;">👤</button>
             <button class="btn btn-secondary" onclick="deleteBoard(${board.id})" style="padding:4px 8px;font-size:12px;">🗑️</button>
           </div>
         </div>
@@ -327,4 +341,123 @@ window.createCard = createCard;
 window.cancelAddCard = cancelAddCard;
 window.saveCardEdit = saveCardEdit;
 window.cancelCardEdit = cancelCardEdit;
+window.toggleCardDone = toggleCardDone;
+
+// === Members Management ===
+let currentBoardId = null;
+
+async function openMembersModal(boardId) {
+  currentBoardId = boardId;
+  const modal = document.getElementById('members-modal');
+  const membersList = document.getElementById('members-list');
+  
+  modal.style.display = 'block';
+  membersList.innerHTML = '<p>Загрузка...</p>';
+  
+  try {
+    const res = await fetch(`/api/boards/${boardId}/members`);
+    if (!res.ok) throw new Error('Ошибка загрузки');
+    const members = await res.json();
+    
+    if (members.length === 0) {
+      membersList.innerHTML = '<p>Нет участников</p>';
+    } else {
+      membersList.innerHTML = members.map(m => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid #eee;">
+          <span><strong>${m.username}</strong></span>
+          <button class="btn btn-secondary" onclick="removeMember(${m.id})" style="padding:2px 8px;font-size:11px;">Удалить</button>
+        </div>
+      `).join('');
+    }
+  } catch (e) {
+    console.error(e);
+    membersList.innerHTML = '<p>Ошибка загрузки участников</p>';
+  }
+}
+
+function closeMembersModal() {
+  document.getElementById('members-modal').style.display = 'none';
+  currentBoardId = null;
+}
+
+async function addMember() {
+  const usernameInput = document.getElementById('new-member-username');
+  const username = usernameInput.value.trim();
+  if (!username) {
+    alert('Введите имя пользователя');
+    return;
+  }
+  
+  try {
+    // Сначала ищем или создаём пользователя
+    let userRes = await fetch(`/api/users?username=${encodeURIComponent(username)}`);
+    let userId;
+    
+    if (userRes.ok) {
+      const users = await userRes.json();
+      if (users.length > 0) {
+        userId = users[0].id;
+      } else {
+        // Создаём нового пользователя
+        userRes = await fetch('/api/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username })
+        });
+        if (!userRes.ok) throw new Error('Не удалось создать пользователя');
+        const user = await userRes.json();
+        userId = user.id;
+      }
+    } else {
+      // Создаём нового пользователя
+      userRes = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username })
+      });
+      if (!userRes.ok) throw new Error('Не удалось создать пользователя');
+      const user = await userRes.json();
+      userId = user.id;
+    }
+    
+    // Добавляем участника на доску
+    const addRes = await fetch(`/api/boards/${currentBoardId}/members`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, role: 'member' })
+    });
+    
+    if (!addRes.ok) throw new Error('Не удалось добавить участника');
+    
+    usernameInput.value = '';
+    openMembersModal(currentBoardId); // Обновить список
+    loadBoards(); // Обновить счётчик участников
+  } catch (e) {
+    console.error(e);
+    alert('Ошибка: ' + e.message);
+  }
+}
+
+async function removeMember(userId) {
+  if (!confirm('Удалить участника из доски?')) return;
+  
+  try {
+    const res = await fetch(`/api/boards/${currentBoardId}/members/${userId}`, {
+      method: 'DELETE'
+    });
+    
+    if (!res.ok) throw new Error('Не удалось удалить участника');
+    
+    openMembersModal(currentBoardId);
+    loadBoards();
+  } catch (e) {
+    console.error(e);
+    alert('Ошибка: ' + e.message);
+  }
+}
+
+window.openMembersModal = openMembersModal;
+window.closeMembersModal = closeMembersModal;
+window.addMember = addMember;
+window.removeMember = removeMember;
 window.toggleCardDone = toggleCardDone;
