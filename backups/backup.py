@@ -3,7 +3,8 @@ import os
 import shutil
 from datetime import datetime
 
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+# PROJECT_ROOT = /opt/trello-local (на уровень выше скрипта)
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(PROJECT_ROOT, "data", "trello.db")
 BACKUPS_DIR = os.path.join(PROJECT_ROOT, "backups")
 
