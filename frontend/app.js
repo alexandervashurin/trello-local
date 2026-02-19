@@ -1,13 +1,20 @@
 // frontend/app.js
 
+// === State ===
 let draggedCard = null;
 let draggedFromList = null;
 let searchQuery = '';
+let currentBoardId = null;
+let isLoading = false;
 
+// === DOM Elements ===
 const boardsContainer = document.getElementById('boards');
 const createBoardBtn = document.getElementById('create-board-btn');
 const searchInput = document.getElementById('search-input');
+const loadingIndicator = document.getElementById('loading-indicator');
+const toastContainer = document.getElementById('toast-container');
 
+// === Event Listeners ===
 if (createBoardBtn) {
   createBoardBtn.addEventListener('click', createBoard);
 }
@@ -19,52 +26,125 @@ if (searchInput) {
   });
 }
 
-async function loadBoards() {
+// === Toast Notifications ===
+function showToast(message, type = 'info', duration = 3000) {
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  
+  const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
+  toast.innerHTML = `<span>${icon}</span><span>${message}</span>`;
+  
+  toastContainer.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.style.animation = 'slideInRight 0.3s ease reverse';
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
+}
+
+// === Loading State ===
+function setLoading(loading) {
+  isLoading = loading;
+  if (loadingIndicator) {
+    loadingIndicator.style.display = loading ? 'flex' : 'none';
+  }
+}
+
+// === API Helper ===
+async function apiRequest(url, options = {}) {
+  const token = localStorage.getItem('token');
+  
+  const defaultOptions = {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    },
+  };
+  
   try {
-    const url = searchQuery 
+    const response = await fetch(url, { ...defaultOptions, ...options });
+    
+    if (response.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login.html';
+      return null;
+    }
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || 'Ошибка запроса');
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('API Error:', error);
+    throw error;
+  }
+}
+
+// === Load Boards ===
+async function loadBoards() {
+  setLoading(true);
+  
+  try {
+    const url = searchQuery
       ? `/api/boards?search=${encodeURIComponent(searchQuery)}`
       : '/api/boards';
+
+    const boards = await apiRequest(url);
     
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('Ошибка загрузки');
-    const boards = await res.json();
-    
+    if (!boards || boards.length === 0) {
+      boardsContainer.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">📋</div>
+          <h3>Нет досок</h3>
+          <p>Создайте первую доску, нажав кнопку "Новая доска"</p>
+        </div>
+      `;
+      setLoading(false);
+      return;
+    }
+
     boardsContainer.innerHTML = boards.map(board => `
       <div class="board" data-board-id="${board.id}">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <div style="display:flex; align-items:center; gap:10px;">
-            <h3>${board.title}</h3>
-            ${board.is_shared ? '<span style="background:#4CAF50;color:white;padding:2px 8px;border-radius:4px;font-size:12px;">🌐 Общая</span>' : ''}
+        <div class="board-header">
+          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <h3>${escapeHtml(board.title)}</h3>
+            ${board.is_shared ? '<span class="board-badge">🌐 Общая</span>' : ''}
           </div>
-          <div style="display:flex; gap:8px; align-items:center;">
-            <span style="font-size:12px;color:#666;" title="Участники">👥 ${board.members.length}</span>
-            <button class="btn btn-secondary" onclick="openMembersModal(${board.id})" style="padding:4px 8px;font-size:12px;">👤</button>
-            <button class="btn btn-secondary" onclick="deleteBoard(${board.id})" style="padding:4px 8px;font-size:12px;">🗑️</button>
+          <div class="board-actions">
+            <span class="members-count" title="Участники">👥 ${board.members.length}</span>
+            <button class="btn btn-secondary" onclick="openMembersModal(${board.id})" title="Участники">👤</button>
+            <button class="btn btn-secondary" onclick="deleteBoard(${board.id})" title="Удалить доску">🗑️</button>
           </div>
         </div>
         <div class="lists-container">
           ${board.lists.map(list => `
-            <div class="list" data-list-id="${list.id}">
-              <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h4>${list.title}</h4>
-                <button class="btn btn-secondary" onclick="deleteList(${list.id})" style="padding:2px 6px;font-size:10px;">🗑️</button>
+            <div class="list" data-list-id="${list.id}" data-list-index="${board.lists.indexOf(list)}">
+              <div class="list-header">
+                <h4>${escapeHtml(list.title)}</h4>
+                <button class="btn btn-secondary" onclick="deleteList(${list.id})" style="padding:2px 6px;font-size:10px;" title="Удалить список">🗑️</button>
               </div>
-              <div class="cards">
+              <div class="cards" data-list-id="${list.id}">
                 ${list.cards.map(card => `
-                  <div class="card" 
-                       draggable="true" 
-                       data-card-id="${card.id}" 
+                  <div class="card"
+                       draggable="true"
+                       data-card-id="${card.id}"
                        data-list-id="${list.id}"
-                       ondblclick="editCard(${card.id}, \`${card.title.replace(/`/g, '\\`')}\`, ${card.content ? `\`${card.content.replace(/`/g, '\\`')}\`` : 'null'})">
+                       ondblclick="editCard(${card.id}, '${escapeJs(board.id)}', '${escapeJs(list.id)}')">
                     <div style="display:flex; justify-content:space-between; align-items:start;">
-                      <div>
-                        <label style="display:flex; align-items:center; gap:6px;">
-                          <input type="checkbox" ${card.done ? 'checked' : ''} onchange="toggleCardDone(${card.id}, this.checked)">
-                          <strong style="text-decoration:${card.done ? 'line-through' : 'none'}">${card.title}</strong>
-                        </label>
-                        ${card.content ? `<p>${card.content}</p>` : ''}
+                      <label style="display:flex; align-items:flex-start; gap:8px; cursor:pointer; flex:1;">
+                        <input type="checkbox" ${card.done ? 'checked' : ''} onchange="toggleCardDone(${card.id}, this.checked)" style="margin-top:3px;">
+                        <span>
+                          <strong class="${card.done ? 'done' : ''}">${escapeHtml(card.title)}</strong>
+                          ${card.content ? `<p>${escapeHtml(card.content)}</p>` : ''}
+                        </span>
+                      </label>
+                      <div class="card-actions">
+                        <button class="btn btn-secondary" onclick="deleteCard(${card.id})" style="padding:2px 6px;font-size:10px;" title="Удалить">🗑️</button>
                       </div>
-                      <button class="btn btn-secondary" onclick="deleteCard(${card.id})" style="padding:2px 6px;font-size:10px;">🗑️</button>
                     </div>
                   </div>
                 `).join('')}
@@ -74,7 +154,7 @@ async function loadBoards() {
               </div>
             </div>
           `).join('')}
-          <div class="list add-list-placeholder" data-board-id="${board.id}">
+          <div class="add-list-placeholder" data-board-id="${board.id}">
             <button class="btn" onclick="showAddListForm(${board.id})">➕ Добавить список</button>
           </div>
         </div>
@@ -87,74 +167,132 @@ async function loadBoards() {
       card.addEventListener('dragend', handleDragEnd);
     });
 
-    document.querySelectorAll('.list').forEach(list => {
-      list.addEventListener('dragover', handleDragOver);
-      list.addEventListener('dragenter', handleDragEnter);
-      list.addEventListener('dragleave', handleDragLeave);
-      list.addEventListener('drop', handleDrop);
+    document.querySelectorAll('.cards').forEach(cardsContainer => {
+      cardsContainer.addEventListener('dragover', handleDragOver);
+      cardsContainer.addEventListener('dragenter', handleDragEnter);
+      cardsContainer.addEventListener('dragleave', handleDragLeave);
+      cardsContainer.addEventListener('drop', handleDrop);
     });
-  } catch (e) {
-    console.error(e);
-    boardsContainer.innerHTML = '<p>Ошибка загрузки данных</p>';
+    
+  } catch (error) {
+    console.error(error);
+    boardsContainer.innerHTML = '<div class="empty-state"><h3>❌ Ошибка загрузки данных</h3><p>Проверьте подключение к серверу</p></div>';
+    showToast('Не удалось загрузить доски', 'error');
+  } finally {
+    setLoading(false);
   }
+}
+
+// === Utility Functions ===
+function escapeHtml(text) {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function escapeJs(str) {
+  return String(str).replace(/'/g, "\\'").replace(/\\/g, '\\\\');
 }
 
 // === Board Actions ===
 async function createBoard() {
   const title = prompt('Название новой доски:');
   if (!title || title.trim() === '') return;
-  
+
   const isShared = confirm('Нажмите OK, чтобы сделать доску общей (доступной другим пользователям), или Отмена для личной доски.');
-  
+
   try {
-    const res = await fetch('/api/boards', {
+    await apiRequest('/api/boards', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: title.trim(), is_shared: isShared })
     });
-    if (res.ok) loadBoards(); else alert('Не удалось создать доску');
-  } catch (e) { console.error(e); alert('Ошибка подключения'); }
+    
+    showToast('Доска создана', 'success');
+    loadBoards();
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось создать доску', 'error');
+  }
 }
 
 async function deleteBoard(boardId) {
   if (!confirm('Удалить доску? Все списки и карточки будут удалены.')) return;
+  
   try {
-    const res = await fetch(`/api/boards/${boardId}`, { method: 'DELETE' });
-    if (res.ok) loadBoards(); else alert('Не удалось удалить доску');
-  } catch (e) { console.error(e); alert('Ошибка подключения'); }
+    await apiRequest(`/api/boards/${boardId}`, { method: 'DELETE' });
+    showToast('Доска удалена', 'success');
+    loadBoards();
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось удалить доску', 'error');
+  }
 }
 
 // === List Actions ===
 function showAddListForm(boardId) {
   const placeholder = document.querySelector(`.add-list-placeholder[data-board-id="${boardId}"]`);
   if (!placeholder) return;
+  
   placeholder.innerHTML = `
     <div class="add-list-form">
-      <input type="text" class="add-list-input" placeholder="Название списка" maxlength="50">
+      <input type="text" class="add-list-input" placeholder="Название списка" maxlength="50" autofocus>
       <div class="add-list-btns">
         <button class="btn btn-primary" onclick="createList(${boardId}, this)">Добавить</button>
         <button class="btn btn-secondary" onclick="cancelAddList(${boardId})">Отмена</button>
       </div>
     </div>
   `;
+  
+  // Focus on input
+  const input = placeholder.querySelector('.add-list-input');
+  if (input) {
+    input.focus();
+    input.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        createList(boardId, placeholder.querySelector('.btn-primary'));
+      } else if (e.key === 'Escape') {
+        cancelAddList(boardId);
+      }
+    });
+  }
 }
 
 async function createList(boardId, button) {
-  const input = button.closest('.add-list-form').querySelector('.add-list-input');
+  const form = button.closest('.add-list-form');
+  const input = form.querySelector('.add-list-input');
   const title = input.value.trim();
-  if (!title) { input.focus(); return; }
+  
+  if (!title) {
+    input.focus();
+    return;
+  }
+  
   try {
-    const res = await fetch(`/api/boards/${boardId}/lists`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }) });
-    if (res.ok) loadBoards(); else alert('Не удалось создать список');
-  } catch (e) { console.error(e); alert('Ошибка подключения'); }
+    await apiRequest(`/api/boards/${boardId}/lists`, {
+      method: 'POST',
+      body: JSON.stringify({ title })
+    });
+    
+    showToast('Список создан', 'success');
+    loadBoards();
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось создать список', 'error');
+  }
 }
 
 async function deleteList(listId) {
   if (!confirm('Удалить список? Все карточки будут удалены.')) return;
+  
   try {
-    const res = await fetch(`/api/lists/${listId}`, { method: 'DELETE' });
-    if (res.ok) loadBoards(); else alert('Не удалось удалить список');
-  } catch (e) { console.error(e); alert('Ошибка подключения'); }
+    await apiRequest(`/api/lists/${listId}`, { method: 'DELETE' });
+    showToast('Список удалён', 'success');
+    loadBoards();
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось удалить список', 'error');
+  }
 }
 
 function cancelAddList(boardId) {
@@ -168,37 +306,70 @@ function cancelAddList(boardId) {
 function showAddCardForm(listId) {
   const placeholder = document.querySelector(`.add-card-placeholder[data-list-id="${listId}"]`);
   if (!placeholder) return;
+  
   placeholder.innerHTML = `
-    <div class="add-list-form">
-      <input type="text" class="add-list-input" placeholder="Название карточки" maxlength="100">
-      <textarea class="add-list-input" placeholder="Описание (необязательно)" rows="2" style="margin-top:5px;"></textarea>
+    <div class="add-card-form">
+      <input type="text" class="add-list-input" placeholder="Название карточки" maxlength="100" autofocus>
+      <textarea class="add-list-input" placeholder="Описание (необязательно)" rows="2" style="margin-top:5px;resize:vertical;"></textarea>
       <div class="add-list-btns">
         <button class="btn btn-primary" onclick="createCard(${listId}, this)">Добавить</button>
         <button class="btn btn-secondary" onclick="cancelAddCard(${listId})">Отмена</button>
       </div>
     </div>
   `;
+  
+  // Focus on title input
+  const input = placeholder.querySelector('input');
+  if (input) {
+    input.focus();
+    input.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        createCard(listId, placeholder.querySelector('.btn-primary'));
+      } else if (e.key === 'Escape') {
+        cancelAddCard(listId);
+      }
+    });
+  }
 }
 
 async function createCard(listId, button) {
-  const form = button.closest('.add-list-form');
+  const form = button.closest('.add-card-form');
   const titleInput = form.querySelector('input');
   const contentInput = form.querySelector('textarea');
   const title = titleInput.value.trim();
   const content = contentInput.value.trim() || null;
-  if (!title) { titleInput.focus(); return; }
+  
+  if (!title) {
+    titleInput.focus();
+    return;
+  }
+  
   try {
-    const res = await fetch(`/api/lists/${listId}/cards`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, content }) });
-    if (res.ok) loadBoards(); else alert('Не удалось создать карточку');
-  } catch (e) { console.error(e); alert('Ошибка подключения'); }
+    await apiRequest(`/api/lists/${listId}/cards`, {
+      method: 'POST',
+      body: JSON.stringify({ title, content })
+    });
+    
+    showToast('Карточка создана', 'success');
+    loadBoards();
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось создать карточку', 'error');
+  }
 }
 
 async function deleteCard(cardId) {
   if (!confirm('Удалить карточку?')) return;
+  
   try {
-    const res = await fetch(`/api/cards/${cardId}`, { method: 'DELETE' });
-    if (res.ok) loadBoards(); else alert('Не удалось удалить карточку');
-  } catch (e) { console.error(e); alert('Ошибка подключения'); }
+    await apiRequest(`/api/cards/${cardId}`, { method: 'DELETE' });
+    showToast('Карточка удалена', 'success');
+    loadBoards();
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось удалить карточку', 'error');
+  }
 }
 
 function cancelAddCard(listId) {
@@ -209,12 +380,20 @@ function cancelAddCard(listId) {
 }
 
 // === Edit Card ===
-function editCard(cardId, title, content) {
+function editCard(cardId, boardId, listId) {
   const cardEl = document.querySelector(`.card[data-card-id="${cardId}"]`);
   if (!cardEl) return;
+  
+  const checkbox = cardEl.querySelector('input[type="checkbox"]');
+  const strong = cardEl.querySelector('strong');
+  const contentP = cardEl.querySelector('p');
+  
+  const title = strong.textContent;
+  const content = contentP ? contentP.textContent : '';
+  
   const originalHTML = cardEl.innerHTML;
   const formDiv = document.createElement('div');
-  formDiv.className = 'add-list-form';
+  formDiv.className = 'add-card-form';
 
   const input = document.createElement('input');
   input.type = 'text';
@@ -226,7 +405,8 @@ function editCard(cardId, title, content) {
   textarea.className = 'add-list-input';
   textarea.rows = 2;
   textarea.style.marginTop = '5px';
-  textarea.value = content || '';
+  textarea.style.resize = 'vertical';
+  textarea.value = content;
 
   const btnsDiv = document.createElement('div');
   btnsDiv.className = 'add-list-btns';
@@ -250,20 +430,44 @@ function editCard(cardId, title, content) {
 
   cardEl.innerHTML = '';
   cardEl.appendChild(formDiv);
+  
   input.focus();
+  input.select();
+  
+  input.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      saveCardEdit(cardId, saveBtn);
+    } else if (e.key === 'Escape') {
+      cancelCardEdit(cardId, originalHTML);
+    }
+  });
 }
 
 async function saveCardEdit(cardId, button) {
-  const form = button.closest('.add-list-form');
+  const form = button.closest('.add-card-form');
   const titleInput = form.querySelector('input');
   const contentInput = form.querySelector('textarea');
   const title = titleInput.value.trim();
   const content = contentInput.value.trim() || null;
-  if (!title) { titleInput.focus(); return; }
+  
+  if (!title) {
+    titleInput.focus();
+    return;
+  }
+  
   try {
-    const res = await fetch(`/api/cards/${cardId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, content }) });
-    if (res.ok) loadBoards(); else alert('Не удалось сохранить карточку');
-  } catch (e) { console.error(e); alert('Ошибка подключения'); }
+    await apiRequest(`/api/cards/${cardId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ title, content })
+    });
+    
+    showToast('Карточка обновлена', 'success');
+    loadBoards();
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось сохранить карточку', 'error');
+  }
 }
 
 function cancelCardEdit(cardId, originalHTML) {
@@ -273,22 +477,19 @@ function cancelCardEdit(cardId, originalHTML) {
 
 // === Toggle Done ===
 async function toggleCardDone(cardId, done) {
+  const checkbox = document.querySelector(`.card[data-card-id="${cardId}"] input[type="checkbox"]`);
+  
   try {
-    const res = await fetch(`/api/cards/${cardId}`, {
+    await apiRequest(`/api/cards/${cardId}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ done })
     });
-    if (!res.ok) {
-      alert('Не удалось обновить статус');
-      document.querySelector(`.card[data-card-id="${cardId}"] input[type="checkbox"]`).checked = !done;
-    } else {
-      loadBoards(); // перезагружаем всё для простоты
-    }
-  } catch (e) {
-    console.error(e);
-    alert('Ошибка подключения');
-    document.querySelector(`.card[data-card-id="${cardId}"] input[type="checkbox"]`).checked = !done;
+    showToast(done ? 'Отмечено выполненным' : 'Возвращено в работу', 'success', 1500);
+    loadBoards();
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось обновить статус', 'error');
+    if (checkbox) checkbox.checked = !done;
   }
 }
 
@@ -297,38 +498,158 @@ function handleDragStart(e) {
   draggedCard = this;
   draggedFromList = this.dataset.listId;
   this.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', this.dataset.cardId);
 }
+
 function handleDragEnd() {
   this.classList.remove('dragging');
+  document.querySelectorAll('.cards').forEach(container => {
+    container.classList.remove('drag-over');
+  });
   draggedCard = null;
   draggedFromList = null;
 }
-function handleDragOver(e) { e.preventDefault(); }
-function handleDragEnter(e) { e.preventDefault(); this.style.backgroundColor = '#ddd'; }
-function handleDragLeave() { this.style.backgroundColor = ''; }
-async function handleDrop(e) {
+
+function handleDragOver(e) {
   e.preventDefault();
-  this.style.backgroundColor = '';
-  const targetListId = this.dataset.listId;
-  const cardId = draggedCard.dataset.cardId;
-  if (targetListId === draggedFromList) return;
-  try {
-    await fetch(`/api/cards/${cardId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ list_id: parseInt(targetListId) }) // ← исправлено!
-    });
-    loadBoards();
-  } catch (e) {
-    console.error(e);
-    alert('Ошибка перемещения карточки');
+  e.dataTransfer.dropEffect = 'move';
+}
+
+function handleDragEnter(e) {
+  e.preventDefault();
+  if (draggedCard && this !== draggedCard.closest('.cards')) {
+    this.classList.add('drag-over');
   }
 }
 
-// === Init ===
-loadBoards();
+function handleDragLeave() {
+  this.classList.remove('drag-over');
+}
 
-// === Экспорт функций для onclick ===
+async function handleDrop(e) {
+  e.preventDefault();
+  this.classList.remove('drag-over');
+  
+  const targetListId = this.dataset.listId;
+  const cardId = draggedCard.dataset.cardId;
+  
+  if (targetListId === draggedFromList) return;
+  
+  try {
+    await apiRequest(`/api/cards/${cardId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ list_id: parseInt(targetListId) })
+    });
+    
+    showToast('Карточка перемещена', 'success', 1500);
+    loadBoards();
+  } catch (error) {
+    console.error(error);
+    showToast('Ошибка перемещения карточки', 'error');
+  }
+}
+
+// === Members Management ===
+async function openMembersModal(boardId) {
+  currentBoardId = boardId;
+  const modal = document.getElementById('members-modal');
+  const membersList = document.getElementById('members-list');
+
+  modal.classList.add('open');
+  membersList.innerHTML = '<div class="loading">Загрузка...</div>';
+
+  try {
+    const members = await apiRequest(`/api/boards/${boardId}/members`);
+
+    if (!members || members.length === 0) {
+      membersList.innerHTML = '<div class="empty-state"><p>Нет участников</p></div>';
+    } else {
+      membersList.innerHTML = members.map(m => `
+        <div class="member-item">
+          <span><strong>${escapeHtml(m.username)}</strong></span>
+          <button class="btn btn-secondary" onclick="removeMember(${m.id})" style="padding:4px 10px;font-size:11px;">Удалить</button>
+        </div>
+      `).join('');
+    }
+    
+    // Focus on input
+    setTimeout(() => {
+      document.getElementById('new-member-username').focus();
+    }, 100);
+  } catch (error) {
+    console.error(error);
+    membersList.innerHTML = '<div class="empty-state"><p>Ошибка загрузки участников</p></div>';
+    showToast('Не удалось загрузить участников', 'error');
+  }
+}
+
+function closeMembersModal() {
+  const modal = document.getElementById('members-modal');
+  modal.classList.remove('open');
+  currentBoardId = null;
+  document.getElementById('new-member-username').value = '';
+}
+
+async function addMember() {
+  const usernameInput = document.getElementById('new-member-username');
+  const username = usernameInput.value.trim();
+  
+  if (!username) {
+    showToast('Введите имя пользователя', 'error');
+    return;
+  }
+
+  try {
+    // Ищем или создаём пользователя
+    let users = await apiRequest(`/api/users?username=${encodeURIComponent(username)}`);
+    let userId;
+
+    if (users && users.length > 0) {
+      userId = users[0].id;
+    } else {
+      // Создаём нового пользователя
+      const user = await apiRequest('/api/users', {
+        method: 'POST',
+        body: JSON.stringify({ username })
+      });
+      userId = user.id;
+    }
+
+    // Добавляем участника на доску
+    await apiRequest(`/api/boards/${currentBoardId}/members`, {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId, role: 'member' })
+    });
+
+    usernameInput.value = '';
+    showToast('Участник добавлен', 'success');
+    openMembersModal(currentBoardId);
+    loadBoards();
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'Ошибка добавления участника', 'error');
+  }
+}
+
+async function removeMember(userId) {
+  if (!confirm('Удалить участника из доски?')) return;
+
+  try {
+    await apiRequest(`/api/boards/${currentBoardId}/members/${userId}`, {
+      method: 'DELETE'
+    });
+
+    showToast('Участник удалён', 'success');
+    openMembersModal(currentBoardId);
+    loadBoards();
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось удалить участника', 'error');
+  }
+}
+
+// === Export Functions for Inline Handlers ===
 window.deleteBoard = deleteBoard;
 window.deleteList = deleteList;
 window.deleteCard = deleteCard;
@@ -342,122 +663,11 @@ window.cancelAddCard = cancelAddCard;
 window.saveCardEdit = saveCardEdit;
 window.cancelCardEdit = cancelCardEdit;
 window.toggleCardDone = toggleCardDone;
-
-// === Members Management ===
-let currentBoardId = null;
-
-async function openMembersModal(boardId) {
-  currentBoardId = boardId;
-  const modal = document.getElementById('members-modal');
-  const membersList = document.getElementById('members-list');
-  
-  modal.style.display = 'block';
-  membersList.innerHTML = '<p>Загрузка...</p>';
-  
-  try {
-    const res = await fetch(`/api/boards/${boardId}/members`);
-    if (!res.ok) throw new Error('Ошибка загрузки');
-    const members = await res.json();
-    
-    if (members.length === 0) {
-      membersList.innerHTML = '<p>Нет участников</p>';
-    } else {
-      membersList.innerHTML = members.map(m => `
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid #eee;">
-          <span><strong>${m.username}</strong></span>
-          <button class="btn btn-secondary" onclick="removeMember(${m.id})" style="padding:2px 8px;font-size:11px;">Удалить</button>
-        </div>
-      `).join('');
-    }
-  } catch (e) {
-    console.error(e);
-    membersList.innerHTML = '<p>Ошибка загрузки участников</p>';
-  }
-}
-
-function closeMembersModal() {
-  document.getElementById('members-modal').style.display = 'none';
-  currentBoardId = null;
-}
-
-async function addMember() {
-  const usernameInput = document.getElementById('new-member-username');
-  const username = usernameInput.value.trim();
-  if (!username) {
-    alert('Введите имя пользователя');
-    return;
-  }
-  
-  try {
-    // Сначала ищем или создаём пользователя
-    let userRes = await fetch(`/api/users?username=${encodeURIComponent(username)}`);
-    let userId;
-    
-    if (userRes.ok) {
-      const users = await userRes.json();
-      if (users.length > 0) {
-        userId = users[0].id;
-      } else {
-        // Создаём нового пользователя
-        userRes = await fetch('/api/users', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username })
-        });
-        if (!userRes.ok) throw new Error('Не удалось создать пользователя');
-        const user = await userRes.json();
-        userId = user.id;
-      }
-    } else {
-      // Создаём нового пользователя
-      userRes = await fetch('/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username })
-      });
-      if (!userRes.ok) throw new Error('Не удалось создать пользователя');
-      const user = await userRes.json();
-      userId = user.id;
-    }
-    
-    // Добавляем участника на доску
-    const addRes = await fetch(`/api/boards/${currentBoardId}/members`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: userId, role: 'member' })
-    });
-    
-    if (!addRes.ok) throw new Error('Не удалось добавить участника');
-    
-    usernameInput.value = '';
-    openMembersModal(currentBoardId); // Обновить список
-    loadBoards(); // Обновить счётчик участников
-  } catch (e) {
-    console.error(e);
-    alert('Ошибка: ' + e.message);
-  }
-}
-
-async function removeMember(userId) {
-  if (!confirm('Удалить участника из доски?')) return;
-  
-  try {
-    const res = await fetch(`/api/boards/${currentBoardId}/members/${userId}`, {
-      method: 'DELETE'
-    });
-    
-    if (!res.ok) throw new Error('Не удалось удалить участника');
-    
-    openMembersModal(currentBoardId);
-    loadBoards();
-  } catch (e) {
-    console.error(e);
-    alert('Ошибка: ' + e.message);
-  }
-}
-
 window.openMembersModal = openMembersModal;
 window.closeMembersModal = closeMembersModal;
 window.addMember = addMember;
 window.removeMember = removeMember;
-window.toggleCardDone = toggleCardDone;
+window.logout = logout;
+
+// === Init ===
+loadBoards();
