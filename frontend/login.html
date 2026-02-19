@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Trello Local - Вход</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .auth-container {
+      max-width: 400px;
+      margin: 50px auto;
+      padding: 30px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .auth-container h1 {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .auth-form {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+    .auth-form input {
+      padding: 12px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    .auth-form button {
+      padding: 12px;
+      background: #0079bf;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .auth-form button:hover {
+      background: #0064a0;
+    }
+    .auth-switch {
+      text-align: center;
+      margin-top: 20px;
+      color: #666;
+    }
+    .auth-switch a {
+      color: #0079bf;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+    .error-message {
+      color: #d93025;
+      background: #fce8e6;
+      padding: 10px;
+      border-radius: 4px;
+      margin-bottom: 15px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-container">
+    <h1>🔐 Trello Local</h1>
+    
+    <div id="error-message" class="error-message"></div>
+    
+    <!-- Форма входа -->
+    <div id="login-form" class="auth-form">
+      <h2 style="text-align:center;">Вход</h2>
+      <input type="text" id="login-username" placeholder="Имя пользователя" autocomplete="username">
+      <input type="password" id="login-password" placeholder="Пароль" autocomplete="current-password">
+      <button onclick="login()">Войти</button>
+      <div class="auth-switch">
+        Нет аккаунта? <a onclick="showRegister()">Зарегистрироваться</a>
+      </div>
+    </div>
+    
+    <!-- Форма регистрации -->
+    <div id="register-form" class="auth-form" style="display:none;">
+      <h2 style="text-align:center;">Регистрация</h2>
+      <input type="text" id="register-username" placeholder="Имя пользователя" autocomplete="username">
+      <input type="password" id="register-password" placeholder="Пароль" autocomplete="new-password">
+      <input type="password" id="register-confirm" placeholder="Подтвердите пароль" autocomplete="new-password">
+      <button onclick="register()">Зарегистрироваться</button>
+      <div class="auth-switch">
+        Есть аккаунт? <a onclick="showLogin()">Войти</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = '/api/auth';
+    
+    function showError(msg) {
+      const el = document.getElementById('error-message');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+    
+    function hideError() {
+      document.getElementById('error-message').style.display = 'none';
+    }
+    
+    function showLogin() {
+      document.getElementById('login-form').style.display = 'flex';
+      document.getElementById('register-form').style.display = 'none';
+      hideError();
+    }
+    
+    function showRegister() {
+      document.getElementById('login-form').style.display = 'none';
+      document.getElementById('register-form').style.display = 'flex';
+      hideError();
+    }
+    
+    async function login() {
+      const username = document.getElementById('login-username').value.trim();
+      const password = document.getElementById('login-password').value;
+      
+      if (!username || !password) {
+        showError('Введите имя пользователя и пароль');
+        return;
+      }
+      
+      try {
+        const res = await fetch(`${API_URL}/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        
+        const data = await res.json();
+        
+        if (res.ok) {
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('user', JSON.stringify({ id: data.user_id, username: data.username }));
+          window.location.href = '/';
+        } else {
+          showError(data.error || 'Ошибка входа');
+        }
+      } catch (e) {
+        console.error(e);
+        showError('Ошибка подключения к серверу');
+      }
+    }
+    
+    async function register() {
+      const username = document.getElementById('register-username').value.trim();
+      const password = document.getElementById('register-password').value;
+      const confirm = document.getElementById('register-confirm').value;
+      
+      if (!username || !password) {
+        showError('Введите имя пользователя и пароль');
+        return;
+      }
+      
+      if (password !== confirm) {
+        showError('Пароли не совпадают');
+        return;
+      }
+      
+      if (password.length < 6) {
+        showError('Пароль должен быть не менее 6 символов');
+        return;
+      }
+      
+      try {
+        const res = await fetch(`${API_URL}/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        
+        const data = await res.json();
+        
+        if (res.ok) {
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('user', JSON.stringify({ id: data.user_id, username: data.username }));
+          window.location.href = '/';
+        } else {
+          showError(data.error || 'Ошибка регистрации');
+        }
+      } catch (e) {
+        console.error(e);
+        showError('Ошибка подключения к серверу');
+      }
+    }
+    
+    // Enter для отправки формы
+    document.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        if (document.getElementById('login-form').style.display !== 'none') {
+          login();
+        } else {
+          register();
+        }
+      }
+    });
+  </script>
+</body>
+</html>
