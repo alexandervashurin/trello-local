@@ -19,8 +19,14 @@ async function loadBoards() {
     boardsContainer.innerHTML = boards.map(board => `
       <div class="board" data-board-id="${board.id}">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-          <h3>${board.title}</h3>
-          <button class="btn btn-secondary" onclick="deleteBoard(${board.id})" style="padding:4px 8px;font-size:12px;">🗑️</button>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <h3>${board.title}</h3>
+            ${board.is_shared ? '<span style="background:#4CAF50;color:white;padding:2px 8px;border-radius:4px;font-size:12px;">🌐 Общая</span>' : ''}
+          </div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <span style="font-size:12px;color:#666;" title="Участники">👥 ${board.members.length}</span>
+            <button class="btn btn-secondary" onclick="deleteBoard(${board.id})" style="padding:4px 8px;font-size:12px;">🗑️</button>
+          </div>
         </div>
         <div class="lists-container">
           ${board.lists.map(list => `
@@ -83,8 +89,15 @@ async function loadBoards() {
 async function createBoard() {
   const title = prompt('Название новой доски:');
   if (!title || title.trim() === '') return;
+  
+  const isShared = confirm('Нажмите OK, чтобы сделать доску общей (доступной другим пользователям), или Отмена для личной доски.');
+  
   try {
-    const res = await fetch('/api/boards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: title.trim() }) });
+    const res = await fetch('/api/boards', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: title.trim(), is_shared: isShared })
+    });
     if (res.ok) loadBoards(); else alert('Не удалось создать доску');
   } catch (e) { console.error(e); alert('Ошибка подключения'); }
 }

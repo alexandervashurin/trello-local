@@ -3,16 +3,20 @@ use sqlx::SqlitePool;
 use std::path::PathBuf;
 
 pub async fn connect() -> Result<SqlitePool, sqlx::Error> {
-    // Путь: ../data/trello.db (относительно backend/)
+    // Путь к базе данных: ../data/trello.db относительно backend/
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
-    let data_dir = PathBuf::from(&manifest_dir).parent().unwrap().join("data");
-    std::fs::create_dir_all(&data_dir)?;
-    let db_path = data_dir.join("trello.db");
+    let db_path = PathBuf::from(&manifest_dir).join("../data/trello.db");
     
-    // Создаём файл базы данных вручную перед подключением
-    std::fs::File::create(&db_path)?;
+    // Создаём директорию, если не существует
+    if let Some(parent) = db_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
     
-    // Используем формат sqlite:// для SQLite
+    // Создаём файл, если не существует
+    if !db_path.exists() {
+        std::fs::File::create(&db_path)?;
+    }
+    
     let db_url = format!("sqlite://{}", db_path.display());
     let pool = SqlitePool::connect(&db_url).await?;
 
@@ -27,7 +31,7 @@ pub async fn connect() -> Result<SqlitePool, sqlx::Error> {
         CREATE TABLE IF NOT EXISTS boards (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
-            owner_id INTEGER NOT NULL,
+            owner_id INTEGER NOT NULL DEFAULT 1,
             is_shared BOOLEAN NOT NULL DEFAULT 0,
             FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
         );
@@ -59,6 +63,11 @@ pub async fn connect() -> Result<SqlitePool, sqlx::Error> {
     )
     .execute(&pool)
     .await?;
+
+    // Создаём пользователя по умолчанию, если не существует
+    sqlx::query("INSERT OR IGNORE INTO users (id, username, created_at) VALUES (1, 'default', strftime('%s', 'now'))")
+        .execute(&pool)
+        .await?;
 
     Ok(pool)
 }

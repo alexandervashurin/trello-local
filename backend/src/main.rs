@@ -42,7 +42,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("📁 База данных: ./data/trello.db");
 
     let listener = TcpListener::bind(&addr).await?;
-    axum::serve(listener, app.into_make_service()).await?;
+    axum::serve(listener, app.into_make_service()).await.unwrap_or_else(|e| {
+        eprintln!("❌ Ошибка сервера: {}", e);
+    });
 
     Ok(())
 }
