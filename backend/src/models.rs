@@ -15,13 +15,21 @@ pub struct Board {
     pub is_shared: bool,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Default)]
 pub struct BoardWithMembers {
     pub id: i64,
     pub title: String,
     pub owner_id: i64,
     pub is_shared: bool,
     pub members: Vec<User>,
+    pub lists: Vec<ListWithCards>,
+}
+
+#[derive(Serialize, Default)]
+pub struct ListWithCards {
+    pub id: i64,
+    pub title: String,
+    pub cards: Vec<Card>,
 }
 
 #[derive(Serialize, sqlx::FromRow)]
@@ -42,7 +50,7 @@ pub struct CardRow {
     pub done: bool,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, sqlx::FromRow)]
 pub struct Card {
     pub id: i64,
     pub title: String,

@@ -9,6 +9,7 @@ use axum::{
 };
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
+use tokio::signal;
 use tower_http::services::{ServeDir, ServeFile};
 
 #[tokio::main]
@@ -40,11 +41,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
     println!("🚀 Trello Local запущен на http://{}", addr);
     println!("📁 База данных: ./data/trello.db");
+    println!("🛑 Нажмите Ctrl+C для остановки сервера");
 
     let listener = TcpListener::bind(&addr).await?;
-    axum::serve(listener, app.into_make_service()).await.unwrap_or_else(|e| {
-        eprintln!("❌ Ошибка сервера: {}", e);
-    });
+    
+    // Запускаем сервер с обработкой Ctrl+C
+    axum::serve(listener, app.into_make_service())
+        .with_graceful_shutdown(async {
+            let _ = signal::ctrl_c().await;
+            println!("\n👋 Остановка сервера...");
+        })
+        .await
+        .unwrap_or_else(|e| {
+            eprintln!("❌ Ошибка сервера: {}", e);
+        });
 
     Ok(())
 }

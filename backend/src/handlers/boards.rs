@@ -1,5 +1,5 @@
 use axum::{extract::{Path, State}, http::StatusCode, Json};
-use crate::models::{Board, BoardWithMembers, User, CreateBoard, UpdateBoard, AddBoardMember};
+use crate::models::{Board, BoardWithMembers, User, CreateBoard, UpdateBoard, AddBoardMember, ListWithCards, Card};
 
 pub async fn get_boards(
     State(pool): State<sqlx::SqlitePool>,
@@ -11,10 +11,11 @@ pub async fn get_boards(
 
     let mut result = Vec::new();
     for board in boards {
+        // Загружаем участников
         let members: Vec<User> = sqlx::query_as(
-            "SELECT u.id, u.username, u.created_at 
-             FROM users u 
-             INNER JOIN board_members bm ON u.id = bm.user_id 
+            "SELECT u.id, u.username, u.created_at
+             FROM users u
+             INNER JOIN board_members bm ON u.id = bm.user_id
              WHERE bm.board_id = ?",
         )
         .bind(board.id)
@@ -22,12 +23,40 @@ pub async fn get_boards(
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
+        // Загружаем списки
+        let lists_rows: Vec<crate::models::List> = sqlx::query_as(
+            "SELECT id, board_id, title, position FROM lists WHERE board_id = ? ORDER BY position, id",
+        )
+        .bind(board.id)
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+        // Загружаем карточки для каждого списка
+        let mut lists = Vec::new();
+        for list in lists_rows {
+            let cards: Vec<Card> = sqlx::query_as(
+                "SELECT id, title, content, done FROM cards WHERE list_id = ? ORDER BY position, id",
+            )
+            .bind(list.id)
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+            lists.push(ListWithCards {
+                id: list.id,
+                title: list.title,
+                cards,
+            });
+        }
+
         result.push(BoardWithMembers {
             id: board.id,
             title: board.title,
             owner_id: board.owner_id,
             is_shared: board.is_shared,
             members,
+            lists,
         });
     }
 
@@ -39,8 +68,8 @@ pub async fn get_boards_for_user(
     State(pool): State<sqlx::SqlitePool>,
 ) -> Result<Json<Vec<BoardWithMembers>>, (StatusCode, String)> {
     let boards: Vec<Board> = sqlx::query_as(
-        "SELECT * FROM boards 
-         WHERE owner_id = ? OR is_shared = 1 
+        "SELECT * FROM boards
+         WHERE owner_id = ? OR is_shared = 1
          ORDER BY id",
     )
     .bind(user_id)
@@ -50,10 +79,11 @@ pub async fn get_boards_for_user(
 
     let mut result = Vec::new();
     for board in boards {
+        // Загружаем участников
         let members: Vec<User> = sqlx::query_as(
-            "SELECT u.id, u.username, u.created_at 
-             FROM users u 
-             INNER JOIN board_members bm ON u.id = bm.user_id 
+            "SELECT u.id, u.username, u.created_at
+             FROM users u
+             INNER JOIN board_members bm ON u.id = bm.user_id
              WHERE bm.board_id = ?",
         )
         .bind(board.id)
@@ -61,12 +91,40 @@ pub async fn get_boards_for_user(
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
+        // Загружаем списки
+        let lists_rows: Vec<crate::models::List> = sqlx::query_as(
+            "SELECT id, board_id, title, position FROM lists WHERE board_id = ? ORDER BY position, id",
+        )
+        .bind(board.id)
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+        // Загружаем карточки для каждого списка
+        let mut lists = Vec::new();
+        for list in lists_rows {
+            let cards: Vec<Card> = sqlx::query_as(
+                "SELECT id, title, content, done FROM cards WHERE list_id = ? ORDER BY position, id",
+            )
+            .bind(list.id)
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+            lists.push(ListWithCards {
+                id: list.id,
+                title: list.title,
+                cards,
+            });
+        }
+
         result.push(BoardWithMembers {
             id: board.id,
             title: board.title,
             owner_id: board.owner_id,
             is_shared: board.is_shared,
             members,
+            lists,
         });
     }
 

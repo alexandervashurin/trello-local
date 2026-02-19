@@ -1,23 +1,18 @@
-// src/db.rs
 use sqlx::SqlitePool;
 use std::path::PathBuf;
 
-pub async fn connect() -> Result<SqlitePool, sqlx::Error> {
-    // Путь к базе данных: ../data/trello.db относительно backend/
-    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
-    let db_path = PathBuf::from(&manifest_dir).join("../data/trello.db");
-    
+pub async fn connect() -> Result<SqlitePool, Box<dyn std::error::Error>> {
+    // Используем абсолютный путь относительно рабочей директории
+    let db_path = PathBuf::from("./data/trello.db");
+
     // Создаём директорию, если не существует
     if let Some(parent) = db_path.parent() {
         std::fs::create_dir_all(parent)?;
     }
+
+    // Формируем URL с явным указанием создания БД если нет
+    let db_url = format!("sqlite://{}?mode=rwc", db_path.display());
     
-    // Создаём файл, если не существует
-    if !db_path.exists() {
-        std::fs::File::create(&db_path)?;
-    }
-    
-    let db_url = format!("sqlite://{}", db_path.display());
     let pool = SqlitePool::connect(&db_url).await?;
 
     // Миграции
@@ -59,15 +54,19 @@ pub async fn connect() -> Result<SqlitePool, sqlx::Error> {
             done BOOLEAN NOT NULL DEFAULT 0,
             FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE
         );
-        "#
+        "#,
     )
     .execute(&pool)
     .await?;
 
-    // Создаём пользователя по умолчанию, если не существует
-    sqlx::query("INSERT OR IGNORE INTO users (id, username, created_at) VALUES (1, 'default', strftime('%s', 'now'))")
-        .execute(&pool)
-        .await?;
+    // Создаём пользователя по умолчанию
+    sqlx::query(
+        "INSERT OR IGNORE INTO users (id, username, created_at) VALUES (1, 'default', strftime('%s', 'now'))",
+    )
+    .execute(&pool)
+    .await?;
 
+    println!("✅ База данных подключена: {}", db_path.display());
+    
     Ok(pool)
 }
