@@ -1,11 +1,20 @@
 // src/db.rs
 use sqlx::SqlitePool;
+use std::path::PathBuf;
 
 pub async fn connect() -> Result<SqlitePool, sqlx::Error> {
-    // Путь: ./data/trello.db (относительно cwd)
-    std::fs::create_dir_all("data")?;
-    let db_url = "sqlite://data/trello.db";
-    let pool = SqlitePool::connect(db_url).await?;
+    // Путь: ../data/trello.db (относительно backend/)
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
+    let data_dir = PathBuf::from(&manifest_dir).parent().unwrap().join("data");
+    std::fs::create_dir_all(&data_dir)?;
+    let db_path = data_dir.join("trello.db");
+    
+    // Создаём файл базы данных вручную перед подключением
+    std::fs::File::create(&db_path)?;
+    
+    // Используем формат sqlite:// для SQLite
+    let db_url = format!("sqlite://{}", db_path.display());
+    let pool = SqlitePool::connect(&db_url).await?;
 
     // Миграции
     sqlx::query(
