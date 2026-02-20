@@ -49,6 +49,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Карточки
         .route("/lists/:list_id/cards", post(controllers::cards::create_card))
         .route("/cards/:id", patch(controllers::cards::update_card).delete(controllers::cards::delete_card))
+        // Метки
+        .route("/cards/:card_id/labels", get(controllers::cards::get_card_labels).post(controllers::cards::create_label))
+        .route("/cards/:card_id/labels/:label_id", patch(controllers::cards::update_label).delete(controllers::cards::delete_label))
+        // Вложения
+        .route("/cards/:card_id/attachments", get(controllers::cards::get_card_attachments))
+        .route("/cards/:card_id/attachments/:attachment_id", delete(controllers::cards::delete_attachment))
+        .route("/cards/:card_id/boards/:board_id/attachments", post(controllers::attachments::upload_attachment))
+        .route("/attachments/:attachment_id", get(controllers::attachments::download_attachment))
+        // История активности
+        .route("/boards/:board_id/activity", get(controllers::cards::get_activity_log))
         // Комментарии
         .route("/cards/:card_id/comments", get(controllers::comments::get_comments).post(controllers::comments::create_comment))
         .route("/comments/:id", patch(controllers::comments::update_comment).delete(controllers::comments::delete_comment))

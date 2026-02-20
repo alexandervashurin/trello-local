@@ -5,8 +5,8 @@ use axum::{
 };
 use sqlx::SqlitePool;
 use crate::models::{Board, CreateBoard, UpdateBoard, AddBoardMember};
-use crate::views::{BoardView, ListView};
-use crate::models::{User, List, Card};
+use crate::views::{BoardView, ListView, CardView};
+use crate::models::{User, List, Card, Label, Attachment};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -216,18 +216,42 @@ async fn load_board_details(
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    // Загружаем карточки для каждого списка
+    // Загружаем карточки для каждого списка с метками и вложениями
     let mut lists = Vec::new();
     for list in lists_rows {
         let cards: Vec<Card> = sqlx::query_as(
-            "SELECT id, list_id, title, content, done FROM cards WHERE list_id = ? ORDER BY position, id",
+            "SELECT id, list_id, title, content, done, due_date FROM cards WHERE list_id = ? ORDER BY position, id",
         )
         .bind(list.id)
         .fetch_all(pool)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-        lists.push(ListView::from_list(list).with_cards(cards));
+        // Для каждой карточки загружаем метки и вложения
+        let mut card_views = Vec::new();
+        for card in cards {
+            let labels: Vec<Label> = sqlx::query_as(
+                "SELECT id, card_id, name, color FROM labels WHERE card_id = ?"
+            )
+            .bind(card.id)
+            .fetch_all(pool)
+            .await
+            .unwrap_or_default();
+
+            let attachments: Vec<Attachment> = sqlx::query_as(
+                "SELECT id, card_id, user_id, filename, file_path, file_size, mime_type, created_at FROM attachments WHERE card_id = ?"
+            )
+            .bind(card.id)
+            .fetch_all(pool)
+            .await
+            .unwrap_or_default();
+
+            card_views.push(CardView::from_card(card)
+                .with_labels(labels)
+                .with_attachments(attachments));
+        }
+
+        lists.push(ListView::from_list(list).with_cards(card_views));
     }
 
     Ok(BoardView::from_board(board)

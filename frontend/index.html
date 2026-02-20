@@ -66,6 +66,86 @@
     </div>
   </div>
 
+  <!-- Модальное окно редактирования карточки -->
+  <div id="card-modal" class="modal">
+    <div class="modal-content card-modal-content">
+      <div class="modal-header">
+        <h2>📝 Карточка</h2>
+        <button class="modal-close" onclick="closeCardModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="card-edit-form">
+          <label class="card-edit-label">
+            <span>Название</span>
+            <input type="text" id="card-title" placeholder="Название карточки" maxlength="100">
+          </label>
+          <label class="card-edit-label">
+            <span>Описание</span>
+            <textarea id="card-content" placeholder="Описание" rows="3"></textarea>
+          </label>
+          <label class="card-edit-label">
+            <span>📅 Дедлайн</span>
+            <input type="datetime-local" id="card-due-date">
+            <button class="btn btn-secondary btn-sm" onclick="clearDueDate()" style="margin-left:8px;">✕</button>
+          </label>
+          
+          <div class="card-section">
+            <h4>🏷️ Метки</h4>
+            <div id="card-labels" class="labels-container"></div>
+            <div class="add-label-form">
+              <input type="text" id="new-label-name" placeholder="Название метки" maxlength="30">
+              <select id="new-label-color">
+                <option value="blue">🔵 Синий</option>
+                <option value="green">🟢 Зелёный</option>
+                <option value="yellow">🟡 Жёлтый</option>
+                <option value="red">🔴 Красный</option>
+                <option value="purple">🟣 Фиолетовый</option>
+                <option value="orange">🟠 Оранжевый</option>
+              </select>
+              <button class="btn btn-primary btn-sm" onclick="addLabel()">Добавить</button>
+            </div>
+          </div>
+
+          <div class="card-section">
+            <h4>📎 Вложения</h4>
+            <div id="card-attachments" class="attachments-container"></div>
+            <div class="add-attachment-form">
+              <input type="file" id="new-attachment" style="display:none;" onchange="handleFileSelect(this)">
+              <button class="btn btn-secondary btn-sm" onclick="document.getElementById('new-attachment').click()">📎 Прикрепить файл</button>
+            </div>
+          </div>
+
+          <div class="card-section">
+            <h4>📜 История</h4>
+            <div id="card-activity" class="activity-container"></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="saveCardFromModal()">💾 Сохранить</button>
+        <button class="btn btn-secondary" onclick="closeCardModal()">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно истории доски -->
+  <div id="activity-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>📜 История доски</h2>
+        <button class="modal-close" onclick="closeActivityModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="activity-list">
+          <div class="loading">Загрузка...</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeActivityModal()">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast контейнер -->
   <div class="toast-container" id="toast-container"></div>
 
@@ -112,6 +192,20 @@
     document.getElementById('new-comment-content').addEventListener('keydown', function(e) {
       if (e.key === 'Enter' && e.ctrlKey) {
         addComment();
+      }
+    });
+
+    // Закрытие модального окна карточки по клику вне его
+    document.getElementById('card-modal').addEventListener('click', function(e) {
+      if (e.target === this) {
+        closeCardModal();
+      }
+    });
+
+    // Закрытие модального окна истории по клику вне его
+    document.getElementById('activity-modal').addEventListener('click', function(e) {
+      if (e.target === this) {
+        closeActivityModal();
       }
     });
   </script>

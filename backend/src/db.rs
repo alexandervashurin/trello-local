@@ -53,6 +53,7 @@ pub async fn connect() -> Result<SqlitePool, Box<dyn std::error::Error>> {
             content TEXT,
             position REAL NOT NULL DEFAULT 0,
             done BOOLEAN NOT NULL DEFAULT 0,
+            due_date INTEGER,
             FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE
         );
         CREATE TABLE IF NOT EXISTS comments (
@@ -63,6 +64,38 @@ pub async fn connect() -> Result<SqlitePool, Box<dyn std::error::Error>> {
             created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
             FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS labels (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            card_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            color TEXT NOT NULL DEFAULT 'blue',
+            FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS attachments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            card_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            filename TEXT NOT NULL,
+            file_path TEXT NOT NULL,
+            file_size INTEGER NOT NULL,
+            mime_type TEXT,
+            created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+            FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS activity_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            board_id INTEGER NOT NULL,
+            user_id INTEGER,
+            action_type TEXT NOT NULL,
+            entity_type TEXT,
+            entity_id INTEGER,
+            description TEXT NOT NULL,
+            metadata TEXT,
+            created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+            FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
         );
         "#,
     )

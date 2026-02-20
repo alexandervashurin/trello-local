@@ -6,6 +6,7 @@ let draggedFromList = null;
 let searchQuery = '';
 let currentBoardId = null;
 let currentCardId = null;
+let currentCardData = null;
 let isLoading = false;
 
 // === DOM Elements ===
@@ -134,16 +135,24 @@ async function loadBoards() {
                        draggable="true"
                        data-card-id="${card.id}"
                        data-list-id="${list.id}"
-                       ondblclick="editCard(${card.id}, '${escapeJs(board.id)}', '${escapeJs(list.id)}')">
+                       ondblclick="openCardModal(${card.id}, ${board.id})">
                     <div style="display:flex; justify-content:space-between; align-items:start;">
                       <label style="display:flex; align-items:flex-start; gap:8px; cursor:pointer; flex:1;">
                         <input type="checkbox" ${card.done ? 'checked' : ''} onchange="toggleCardDone(${card.id}, this.checked)" style="margin-top:3px;">
-                        <span>
-                          <strong class="${card.done ? 'done' : ''}">${escapeHtml(card.title)}</strong>
+                        <span style="width:100%;">
+                          <div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:4px;">
+                            ${(card.labels || []).map(l => `<span class="label-badge label-${l.color}" title="${escapeHtml(l.name)}">${escapeHtml(l.name)}</span>`).join('')}
+                          </div>
+                          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                            <strong class="${card.done ? 'done' : ''}">${escapeHtml(card.title)}</strong>
+                            ${card.due_date ? `<span class="due-date-badge ${isOverdue(card.due_date) ? 'overdue' : ''}" title="Дедлайн">${formatDueDate(card.due_date)}</span>` : ''}
+                          </div>
                           ${card.content ? `<p>${escapeHtml(card.content)}</p>` : ''}
+                          ${(card.attachments || []).length > 0 ? `<div style="margin-top:4px;font-size:11px;color:var(--text-secondary);">📎 ${card.attachments.length} влож.</div>` : ''}
                         </span>
                       </label>
                       <div class="card-actions">
+                        <button class="btn btn-secondary" onclick="openCardModal(${card.id}, ${board.id})" title="Открыть карточку" style="padding:2px 6px;font-size:10px;">✏️</button>
                         <button class="btn btn-secondary" onclick="openCommentsModal(${card.id})" title="Комментарии" style="padding:2px 6px;font-size:10px;">💬</button>
                         <button class="btn btn-secondary" onclick="deleteCard(${card.id})" style="padding:2px 6px;font-size:10px;" title="Удалить">🗑️</button>
                       </div>
@@ -762,6 +771,299 @@ async function editComment(commentId) {
   }
 }
 
+// === Helper Functions for Due Date ===
+function formatDueDate(timestamp) {
+  const date = new Date(timestamp * 1000);
+  const now = new Date();
+  const diff = date - now;
+  const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+  
+  if (days < 0) return `⏰ Просрочено: ${date.toLocaleDateString('ru-RU')}`;
+  if (days === 0) return '⏰ Сегодня';
+  if (days === 1) return '⏰ Завтра';
+  if (days <= 7) return `⏰ Через ${days} дн.`;
+  return `⏰ ${date.toLocaleDateString('ru-RU')}`;
+}
+
+function isOverdue(timestamp) {
+  return timestamp * 1000 < Date.now();
+}
+
+// === Card Modal Functions ===
+async function openCardModal(cardId, boardId) {
+  currentCardId = cardId;
+  currentBoardId = boardId;
+  const modal = document.getElementById('card-modal');
+  
+  try {
+    // Загружаем карточку (данные уже есть в boards, но обновим)
+    const card = await apiRequest(`/api/cards/${cardId}`);
+    currentCardData = card;
+    
+    // Заполняем форму
+    document.getElementById('card-title').value = card.title || '';
+    document.getElementById('card-content').value = card.content || '';
+    
+    if (card.due_date) {
+      const date = new Date(card.due_date * 1000);
+      document.getElementById('card-due-date').value = date.toISOString().slice(0, 16);
+    } else {
+      document.getElementById('card-due-date').value = '';
+    }
+    
+    // Загружаем метки
+    await loadCardLabels(cardId);
+    
+    // Загружаем вложения
+    await loadCardAttachments(cardId);
+    
+    // Загружаем историю
+    await loadBoardActivity(boardId);
+    
+    modal.classList.add('open');
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось загрузить карточку', 'error');
+  }
+}
+
+function closeCardModal() {
+  const modal = document.getElementById('card-modal');
+  modal.classList.remove('open');
+  currentCardId = null;
+  currentCardData = null;
+}
+
+async function saveCardFromModal() {
+  const title = document.getElementById('card-title').value.trim();
+  const content = document.getElementById('card-content').value.trim() || null;
+  const dueDateInput = document.getElementById('card-due-date').value;
+  const due_date = dueDateInput ? Math.floor(new Date(dueDateInput).getTime() / 1000) : null;
+  
+  if (!title) {
+    showToast('Введите название карточки', 'error');
+    return;
+  }
+  
+  try {
+    await apiRequest(`/api/cards/${currentCardId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ title, content, due_date })
+    });
+    
+    showToast('Карточка сохранена', 'success');
+    closeCardModal();
+    loadBoards();
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось сохранить карточку', 'error');
+  }
+}
+
+function clearDueDate() {
+  document.getElementById('card-due-date').value = '';
+}
+
+// === Labels Functions ===
+async function loadCardLabels(cardId) {
+  const container = document.getElementById('card-labels');
+  
+  try {
+    const labels = await apiRequest(`/api/cards/${cardId}/labels`);
+    
+    if (!labels || labels.length === 0) {
+      container.innerHTML = '<div class="empty-state" style="padding:10px;"><p>Нет меток</p></div>';
+    } else {
+      container.innerHTML = labels.map(l => `
+        <div class="label-item label-${l.color}">
+          <span>${escapeHtml(l.name)}</span>
+          <button class="btn btn-secondary btn-sm" onclick="deleteLabel(${l.id})" style="padding:2px 6px;margin-left:auto;">✕</button>
+        </div>
+      `).join('');
+    }
+  } catch (error) {
+    container.innerHTML = '<div class="empty-state" style="padding:10px;"><p>Ошибка загрузки</p></div>';
+  }
+}
+
+async function addLabel() {
+  const nameInput = document.getElementById('new-label-name');
+  const colorSelect = document.getElementById('new-label-color');
+  const name = nameInput.value.trim();
+  const color = colorSelect.value;
+  
+  if (!name) {
+    showToast('Введите название метки', 'error');
+    return;
+  }
+  
+  try {
+    await apiRequest(`/api/cards/${currentCardId}/labels`, {
+      method: 'POST',
+      body: JSON.stringify({ name, color })
+    });
+    
+    nameInput.value = '';
+    showToast('Метка добавлена', 'success');
+    loadCardLabels(currentCardId);
+    loadBoards();
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось добавить метку', 'error');
+  }
+}
+
+async function deleteLabel(labelId) {
+  try {
+    await apiRequest(`/api/cards/${currentCardId}/labels/${labelId}`, {
+      method: 'DELETE'
+    });
+    
+    showToast('Метка удалена', 'success');
+    loadCardLabels(currentCardId);
+    loadBoards();
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось удалить метку', 'error');
+  }
+}
+
+// === Attachments Functions ===
+async function loadCardAttachments(cardId) {
+  const container = document.getElementById('card-attachments');
+  
+  try {
+    const attachments = await apiRequest(`/api/cards/${cardId}/attachments`);
+    
+    if (!attachments || attachments.length === 0) {
+      container.innerHTML = '<div class="empty-state" style="padding:10px;"><p>Нет вложений</p></div>';
+    } else {
+      container.innerHTML = attachments.map(a => `
+        <div class="attachment-item">
+          <a href="/api/attachments/${a.id}" target="_blank" style="display:flex; align-items:center; gap:8px; text-decoration:none; color:var(--text-primary);">
+            <span>📎</span>
+            <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(a.filename)}</span>
+            <span style="font-size:11px; color:var(--text-secondary);">${formatFileSize(a.file_size)}</span>
+          </a>
+          <button class="btn btn-secondary btn-sm" onclick="deleteAttachment(${a.id})" style="padding:2px 6px;margin-left:8px;">✕</button>
+        </div>
+      `).join('');
+    }
+  } catch (error) {
+    container.innerHTML = '<div class="empty-state" style="padding:10px;"><p>Ошибка загрузки</p></div>';
+  }
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' Б';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' КБ';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' МБ';
+}
+
+async function handleFileSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+  
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`/api/cards/${currentCardId}/boards/${currentBoardId}/attachments`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: formData
+    });
+    
+    if (!response.ok) {
+      throw new Error('Ошибка загрузки');
+    }
+    
+    showToast('Файл загружен', 'success');
+    loadCardAttachments(currentCardId);
+    loadBoards();
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось загрузить файл', 'error');
+  }
+  
+  input.value = '';
+}
+
+async function deleteAttachment(attachmentId) {
+  if (!confirm('Удалить вложение?')) return;
+  
+  try {
+    await apiRequest(`/api/cards/${currentCardId}/attachments/${attachmentId}`, {
+      method: 'DELETE'
+    });
+    
+    showToast('Вложение удалено', 'success');
+    loadCardAttachments(currentCardId);
+    loadBoards();
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось удалить вложение', 'error');
+  }
+}
+
+// === Activity Log Functions ===
+async function loadBoardActivity(boardId) {
+  const container = document.getElementById('card-activity');
+  
+  try {
+    const activities = await apiRequest(`/api/boards/${boardId}/activity`);
+    
+    if (!activities || activities.length === 0) {
+      container.innerHTML = '<div class="empty-state" style="padding:10px;"><p>Нет записей</p></div>';
+    } else {
+      container.innerHTML = activities.map(a => `
+        <div class="activity-item">
+          <div style="font-size:12px; color:var(--text-secondary);">${new Date(a.created_at * 1000).toLocaleString('ru-RU')}</div>
+          <div style="margin-top:4px;">${escapeHtml(a.description)}</div>
+        </div>
+      `).join('');
+    }
+  } catch (error) {
+    container.innerHTML = '<div class="empty-state" style="padding:10px;"><p>Ошибка загрузки</p></div>';
+  }
+}
+
+async function openActivityModal(boardId) {
+  currentBoardId = boardId;
+  const modal = document.getElementById('activity-modal');
+  const list = document.getElementById('activity-list');
+  
+  modal.classList.add('open');
+  list.innerHTML = '<div class="loading">Загрузка...</div>';
+  
+  try {
+    const activities = await apiRequest(`/api/boards/${boardId}/activity`);
+    
+    if (!activities || activities.length === 0) {
+      list.innerHTML = '<div class="empty-state"><p>Нет записей в истории</p></div>';
+    } else {
+      list.innerHTML = activities.map(a => `
+        <div class="activity-item">
+          <div style="font-size:12px; color:var(--text-secondary);">${new Date(a.created_at * 1000).toLocaleString('ru-RU')}</div>
+          <div style="margin-top:4px;">${escapeHtml(a.description)}</div>
+        </div>
+      `).join('');
+    }
+  } catch (error) {
+    console.error(error);
+    list.innerHTML = '<div class="empty-state"><p>Ошибка загрузки</p></div>';
+  }
+}
+
+function closeActivityModal() {
+  const modal = document.getElementById('activity-modal');
+  modal.classList.remove('open');
+  currentBoardId = null;
+}
+
 // === Export Functions for Inline Handlers ===
 window.deleteBoard = deleteBoard;
 window.deleteList = deleteList;
@@ -786,6 +1088,16 @@ window.addComment = addComment;
 window.deleteComment = deleteComment;
 window.editComment = editComment;
 window.logout = logout;
+window.openCardModal = openCardModal;
+window.closeCardModal = closeCardModal;
+window.saveCardFromModal = saveCardFromModal;
+window.clearDueDate = clearDueDate;
+window.addLabel = addLabel;
+window.deleteLabel = deleteLabel;
+window.handleFileSelect = handleFileSelect;
+window.deleteAttachment = deleteAttachment;
+window.openActivityModal = openActivityModal;
+window.closeActivityModal = closeActivityModal;
 
 // === Init ===
 loadBoards();

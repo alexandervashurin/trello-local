@@ -4,3 +4,4 @@ pub mod lists;
 pub mod cards;
 pub mod users;
 pub mod comments;
+pub mod attachments;
