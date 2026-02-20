@@ -180,6 +180,19 @@
     </div>
   </div>
 
+  <!-- Модальное окно просмотра изображений -->
+  <div id="image-preview-modal" class="modal">
+    <div class="modal-content" style="max-width:90%; min-width:auto; padding:12px; background:transparent; box-shadow:none;">
+      <div class="modal-header">
+        <h2 style="color:white;">🖼️ Просмотр изображения</h2>
+        <button class="modal-close" onclick="closeImagePreview()" style="color:white;">&times;</button>
+      </div>
+      <div class="modal-body" style="max-height:none; text-align:center;">
+        <img id="image-preview-img" src="" alt="Preview" style="max-width:100%; max-height:80vh; border-radius:4px;">
+      </div>
+    </div>
+  </div>
+
   <!-- Toast контейнер -->
   <div class="toast-container" id="toast-container"></div>
 
@@ -247,6 +260,13 @@
     document.getElementById('invitations-modal').addEventListener('click', function(e) {
       if (e.target === this) {
         closeInvitationsModal();
+      }
+    });
+
+    // Закрытие модального окна просмотра изображений по клику вне его
+    document.getElementById('image-preview-modal').addEventListener('click', function(e) {
+      if (e.target === this) {
+        closeImagePreview();
       }
     });
 

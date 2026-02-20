@@ -999,6 +999,34 @@ body {
 
 /* Button Small */
 .btn-sm {
-  padding: 4px 10px;
+  padding: 4px 8px;
   font-size: 12px;
+}
+
+/* Image Preview Modal */
+#image-preview-modal .modal-content {
+  background: rgba(0, 0, 0, 0.9);
+  max-width: 90%;
+  min-width: auto;
+  padding: 12px;
+  box-shadow: none;
+}
+
+#image-preview-modal .modal-header h2 {
+  color: white;
+}
+
+#image-preview-modal .modal-close {
+  color: white;
+}
+
+#image-preview-modal .modal-body {
+  max-height: none;
+  text-align: center;
+}
+
+#image-preview-img {
+  max-width: 100%;
+  max-height: 80vh;
+  border-radius: 4px;
 }

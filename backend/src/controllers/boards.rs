@@ -116,6 +116,18 @@ pub async fn create_board(
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
+    // Логирование
+    let _ = crate::controllers::cards::log_activity(
+        &pool,
+        board.id,
+        Some(owner_id),
+        "create",
+        Some("board"),
+        Some(board.id),
+        &format!("Создана доска \"{}\"", &payload.title),
+        None,
+    ).await;
+
     Ok(Json(board))
 }
 
@@ -147,9 +159,9 @@ pub async fn update_board(
     let board: Board = sqlx::query_as::<_, Board>(
         "UPDATE boards SET title = COALESCE(?, title), is_shared = COALESCE(?, is_shared), visibility = COALESCE(?, visibility) WHERE id = ? RETURNING id, title, owner_id, is_shared, visibility",
     )
-    .bind(payload.title)
+    .bind(&payload.title)
     .bind(payload.is_shared)
-    .bind(payload.visibility)
+    .bind(&payload.visibility)
     .bind(id)
     .fetch_one(&pool)
     .await
@@ -161,6 +173,30 @@ pub async fn update_board(
         }
     })?;
 
+    // Логирование изменений
+    let mut changes = Vec::new();
+    if payload.title.is_some() {
+        changes.push(format!("название → \"{}\"", payload.title.as_ref().unwrap_or(&board.title)));
+    }
+    if payload.is_shared.is_some() {
+        changes.push(format!("общий доступ → {}", if payload.is_shared.unwrap() { "включён" } else { "выключен" }));
+    }
+    if payload.visibility.is_some() {
+        changes.push(format!("видимость → {}", payload.visibility.as_ref().unwrap_or(&board.visibility)));
+    }
+    if !changes.is_empty() {
+        let _ = crate::controllers::cards::log_activity(
+            &pool,
+            id,
+            Some(claims.user_id),
+            "update",
+            Some("board"),
+            Some(id),
+            &format!("Доска \"{}\": {}", board.title, changes.join(", ")),
+            None,
+        ).await;
+    }
+
     Ok(Json(board))
 }
 
@@ -169,6 +205,17 @@ pub async fn delete_board(
     Path(id): Path<i64>,
     State(pool): State<SqlitePool>,
 ) -> Result<Json<()>, (StatusCode, String)> {
+    // Получаем название доски перед удалением
+    let board_title: Option<(String,)> = sqlx::query_as(
+        "SELECT title FROM boards WHERE id = ?"
+    )
+    .bind(id)
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let title = board_title.map(|t| t.0).unwrap_or_else(|| "неизвестно".to_string());
+
     let result = sqlx::query("DELETE FROM boards WHERE id = ?")
         .bind(id)
         .execute(&pool)
@@ -178,6 +225,17 @@ pub async fn delete_board(
     if result.rows_affected() == 0 {
         Err((StatusCode::NOT_FOUND, "Доска не найдена".to_string()))
     } else {
+        // Логирование
+        let _ = crate::controllers::cards::log_activity(
+            &pool,
+            id,
+            None,
+            "delete",
+            Some("board"),
+            Some(id),
+            &format!("Удалена доска \"{}\"", title),
+            None,
+        ).await;
         Ok(Json(()))
     }
 }

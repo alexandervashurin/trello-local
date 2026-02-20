@@ -1005,17 +1005,20 @@ function clearDueDate() {
 // === Labels Functions ===
 async function loadCardLabels(cardId) {
   const container = document.getElementById('card-labels');
-  
+
   try {
     const labels = await apiRequest(`/api/cards/${cardId}/labels`);
-    
+
     if (!labels || labels.length === 0) {
       container.innerHTML = '<div class="empty-state" style="padding:10px;"><p>Нет меток</p></div>';
     } else {
       container.innerHTML = labels.map(l => `
         <div class="label-item label-${l.color}">
           <span>${escapeHtml(l.name)}</span>
-          <button class="btn btn-secondary btn-sm" onclick="deleteLabel(${l.id})" style="padding:2px 6px;margin-left:auto;">✕</button>
+          <div style="display:flex; gap:4px; margin-left:auto;">
+            <button class="btn btn-secondary btn-sm" onclick="editLabel(${l.id}, '${escapeJs(l.name)}', '${l.color}')" style="padding:2px 6px;" title="Редактировать">✏️</button>
+            <button class="btn btn-secondary btn-sm" onclick="deleteLabel(${l.id})" style="padding:2px 6px;" title="Удалить">✕</button>
+          </div>
         </div>
       `).join('');
     }
@@ -1056,7 +1059,7 @@ async function deleteLabel(labelId) {
     await apiRequest(`/api/cards/${currentCardId}/labels/${labelId}`, {
       method: 'DELETE'
     });
-    
+
     showToast('Метка удалена', 'success');
     loadCardLabels(currentCardId);
     loadBoards();
@@ -1066,26 +1069,63 @@ async function deleteLabel(labelId) {
   }
 }
 
+async function editLabel(labelId, currentName, currentColor) {
+  const newName = prompt('Новое название метки:', currentName);
+  if (newName === null || newName.trim() === '') return;
+
+  const colors = ['blue', 'green', 'yellow', 'red', 'purple', 'orange'];
+  let newColor = currentColor;
+  
+  const colorInput = prompt('Выберите цвет (blue, green, yellow, red, purple, orange):', currentColor);
+  if (colorInput !== null && colors.includes(colorInput.trim().toLowerCase())) {
+    newColor = colorInput.trim().toLowerCase();
+  }
+
+  try {
+    await apiRequest(`/api/cards/${currentCardId}/labels/${labelId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name: newName.trim(), color: newColor })
+    });
+
+    showToast('Метка обновлена', 'success');
+    loadCardLabels(currentCardId);
+    loadBoards();
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось обновить метку', 'error');
+  }
+}
+
 // === Attachments Functions ===
 async function loadCardAttachments(cardId) {
   const container = document.getElementById('card-attachments');
-  
+
   try {
     const attachments = await apiRequest(`/api/cards/${cardId}/attachments`);
-    
+
     if (!attachments || attachments.length === 0) {
       container.innerHTML = '<div class="empty-state" style="padding:10px;"><p>Нет вложений</p></div>';
     } else {
-      container.innerHTML = attachments.map(a => `
+      container.innerHTML = attachments.map(a => {
+        const isImage = a.mime_type && a.mime_type.startsWith('image/');
+        const previewHtml = isImage 
+          ? `<div style="margin-top:8px;"><img src="/api/attachments/${a.id}" alt="${escapeHtml(a.filename)}" style="max-width:200px; max-height:150px; border-radius:4px; cursor:pointer;" onclick="openImagePreview('/api/attachments/${a.id}')"></div>`
+          : '';
+        
+        return `
         <div class="attachment-item">
-          <a href="/api/attachments/${a.id}" target="_blank" style="display:flex; align-items:center; gap:8px; text-decoration:none; color:var(--text-primary);">
-            <span>📎</span>
-            <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(a.filename)}</span>
+          <div style="display:flex; align-items:center; gap:8px; flex:1;">
+            <span style="font-size:18px;">${isImage ? '🖼️' : '📎'}</span>
+            <a href="/api/attachments/${a.id}" target="_blank" style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-decoration:none; color:var(--text-primary);">
+              ${escapeHtml(a.filename)}
+            </a>
             <span style="font-size:11px; color:var(--text-secondary);">${formatFileSize(a.file_size)}</span>
-          </a>
+          </div>
           <button class="btn btn-secondary btn-sm" onclick="deleteAttachment(${a.id})" style="padding:2px 6px;margin-left:8px;">✕</button>
         </div>
-      `).join('');
+        ${previewHtml}
+      `;
+      }).join('');
     }
   } catch (error) {
     container.innerHTML = '<div class="empty-state" style="padding:10px;"><p>Ошибка загрузки</p></div>';
@@ -1096,6 +1136,18 @@ function formatFileSize(bytes) {
   if (bytes < 1024) return bytes + ' Б';
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' КБ';
   return (bytes / (1024 * 1024)).toFixed(1) + ' МБ';
+}
+
+function openImagePreview(url) {
+  const modal = document.getElementById('image-preview-modal');
+  const img = document.getElementById('image-preview-img');
+  img.src = url;
+  modal.classList.add('open');
+}
+
+function closeImagePreview() {
+  const modal = document.getElementById('image-preview-modal');
+  modal.classList.remove('open');
 }
 
 async function handleFileSelect(input) {
@@ -1242,6 +1294,9 @@ window.closeInvitationsModal = closeInvitationsModal;
 window.createInvitation = createInvitation;
 window.deleteInvitation = deleteInvitation;
 window.copyInviteLink = copyInviteLink;
+window.editLabel = editLabel;
+window.openImagePreview = openImagePreview;
+window.closeImagePreview = closeImagePreview;
 
 // === Init ===
 loadBoards();
