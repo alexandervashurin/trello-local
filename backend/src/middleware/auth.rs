@@ -10,8 +10,12 @@ use jsonwebtoken::{decode, Validation, Algorithm, DecodingKey};
 use crate::views::Claims;
 use crate::controllers::sessions;
 
-// Секретный ключ для JWT (в продакшене использовать переменную окружения!)
-const JWT_SECRET: &[u8] = b"trello-local-secret-key-change-in-production-2024";
+/// Получение JWT secret из переменной окружения или использование значения по умолчанию
+fn get_jwt_secret() -> Vec<u8> {
+    std::env::var("JWT_SECRET")
+        .unwrap_or_else(|_| "trello-local-secret-key-change-in-production-2024".to_string())
+        .into_bytes()
+}
 
 /// Извлечение Claims из запроса
 pub async fn extract_claims(
@@ -43,7 +47,7 @@ pub async fn extract_claims(
 
             match decode::<Claims>(
                 token,
-                &DecodingKey::from_secret(JWT_SECRET),
+                &DecodingKey::from_secret(&get_jwt_secret()),
                 &Validation::new(Algorithm::HS256),
             ) {
                 Ok(token_data) => {

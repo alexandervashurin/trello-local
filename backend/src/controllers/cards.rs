@@ -25,6 +25,14 @@ pub async fn create_card(
     State(pool): State<SqlitePool>,
     Json(payload): Json<CreateCard>,
 ) -> Result<Json<Card>, (StatusCode, String)> {
+    // Валидация названия
+    if payload.title.trim().is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "Название не может быть пустым".to_string()));
+    }
+    if payload.title.len() > 200 {
+        return Err((StatusCode::BAD_REQUEST, "Название слишком длинное".to_string()));
+    }
+
     // Получаем board_id из list_id
     let board_id = get_board_id_by_list_id(&pool, list_id).await
         .ok_or((StatusCode::NOT_FOUND, "Список не найден".to_string()))?;

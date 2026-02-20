@@ -93,6 +93,14 @@ pub async fn create_board(
     claims: Option<Extension<Claims>>,
     Json(payload): Json<CreateBoard>,
 ) -> Result<Json<Board>, (StatusCode, String)> {
+    // Валидация названия
+    if payload.title.trim().is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "Название не может быть пустым".to_string()));
+    }
+    if payload.title.len() > 200 {
+        return Err((StatusCode::BAD_REQUEST, "Название слишком длинное".to_string()));
+    }
+
     let owner_id = claims.map(|c| c.user_id).unwrap_or(1); // Default to 1 for tests
 
     let board: Board = sqlx::query_as::<_, Board>(

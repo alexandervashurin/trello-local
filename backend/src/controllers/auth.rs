@@ -12,14 +12,31 @@ use std::time::SystemTime;
 use crate::views::Claims;
 use crate::controllers::sessions;
 
-// Секретный ключ для JWT (в продакшене использовать переменную окружения!)
-const JWT_SECRET: &[u8] = b"trello-local-secret-key-change-in-production-2024";
+/// Получение JWT secret из переменной окружения
+fn get_jwt_secret() -> Vec<u8> {
+    std::env::var("JWT_SECRET")
+        .unwrap_or_else(|_| "trello-local-secret-key-change-in-production-2024".to_string())
+        .into_bytes()
+}
 
 /// Регистрация нового пользователя
 pub async fn register(
     State(pool): State<SqlitePool>,
     Json(payload): Json<RegisterUser>,
 ) -> Result<Json<AuthToken>, (StatusCode, String)> {
+    // Валидация имени пользователя
+    if payload.username.trim().len() < 3 {
+        return Err((StatusCode::BAD_REQUEST, "Имя пользователя должно быть не менее 3 символов".to_string()));
+    }
+    if payload.username.len() > 50 {
+        return Err((StatusCode::BAD_REQUEST, "Имя пользователя слишком длинное".to_string()));
+    }
+
+    // Валидация пароля
+    if payload.password.len() < 6 {
+        return Err((StatusCode::BAD_REQUEST, "Пароль должен быть не менее 6 символов".to_string()));
+    }
+
     let password_hash = bcrypt::hash(&payload.password, 12)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -97,7 +114,7 @@ fn generate_token(user_id: i64, username: &str) -> Result<String, (StatusCode, S
         ip_address: None,
     };
 
-    encode(&Header::default(), &claims, &EncodingKey::from_secret(JWT_SECRET))
+    encode(&Header::default(), &claims, &EncodingKey::from_secret(&get_jwt_secret()))
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
@@ -107,8 +124,8 @@ pub async fn validate_token(
     token: String,
 ) -> Result<Json<Claims>, (StatusCode, String)> {
     use jsonwebtoken::{decode, Validation, Algorithm, DecodingKey};
-    
-    decode::<Claims>(&token, &DecodingKey::from_secret(JWT_SECRET), &Validation::new(Algorithm::HS256))
+
+    decode::<Claims>(&token, &DecodingKey::from_secret(&get_jwt_secret()), &Validation::new(Algorithm::HS256))
         .map(|data| Json(data.claims))
         .map_err(|_| (StatusCode::UNAUTHORIZED, "Неверный токен".to_string()))
 }
