@@ -389,4 +389,4 @@ Copyright (c) 2026 Александр Вашурин
 ## 📞 Контакты
 
 - GitHub: [@alexandervashurin](https://github.com/alexandervashurin)
-- Email: a.vashurin@pso.local
+- Email: alexandervashurin@yandex.ru
