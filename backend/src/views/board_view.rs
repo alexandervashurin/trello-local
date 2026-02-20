@@ -1,5 +1,5 @@
 use serde::Serialize;
-use crate::models::{User, Board, List, Card, Label, Attachment};
+use crate::models::{Board, List, Card, Label, Attachment, BoardMember};
 
 #[derive(Serialize, Default)]
 pub struct BoardView {
@@ -7,8 +7,25 @@ pub struct BoardView {
     pub title: String,
     pub owner_id: i64,
     pub is_shared: bool,
-    pub members: Vec<User>,
+    pub visibility: String,
+    pub members: Vec<BoardMemberView>,
     pub lists: Vec<ListView>,
+}
+
+#[derive(Serialize, Default)]
+pub struct BoardMemberView {
+    pub user_id: i64,
+    pub username: String,
+    pub role: String,
+}
+
+#[derive(Serialize)]
+pub struct InvitationView {
+    pub token: String,
+    pub board_id: i64,
+    pub role: String,
+    pub expires_at: Option<i64>,
+    pub invite_link: String,
 }
 
 impl BoardView {
@@ -18,13 +35,18 @@ impl BoardView {
             title: board.title,
             owner_id: board.owner_id,
             is_shared: board.is_shared,
+            visibility: board.visibility,
             members: Vec::new(),
             lists: Vec::new(),
         }
     }
 
-    pub fn with_members(mut self, members: Vec<User>) -> Self {
-        self.members = members;
+    pub fn with_members(mut self, members: Vec<BoardMember>) -> Self {
+        self.members = members.into_iter().map(|m| BoardMemberView {
+            user_id: m.user_id,
+            username: m.username,
+            role: m.role,
+        }).collect();
         self
     }
 

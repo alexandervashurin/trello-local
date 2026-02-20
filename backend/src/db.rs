@@ -29,6 +29,7 @@ pub async fn connect() -> Result<SqlitePool, Box<dyn std::error::Error>> {
             title TEXT NOT NULL,
             owner_id INTEGER NOT NULL DEFAULT 1,
             is_shared BOOLEAN NOT NULL DEFAULT 0,
+            visibility TEXT NOT NULL DEFAULT 'private',
             FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
         );
         CREATE TABLE IF NOT EXISTS board_members (
@@ -38,6 +39,18 @@ pub async fn connect() -> Result<SqlitePool, Box<dyn std::error::Error>> {
             PRIMARY KEY (board_id, user_id),
             FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS board_invitations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            board_id INTEGER NOT NULL,
+            token TEXT NOT NULL UNIQUE,
+            role TEXT NOT NULL DEFAULT 'member',
+            created_by INTEGER NOT NULL,
+            created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+            expires_at INTEGER,
+            used BOOLEAN NOT NULL DEFAULT 0,
+            FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE,
+            FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
         );
         CREATE TABLE IF NOT EXISTS lists (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -107,6 +120,18 @@ pub async fn connect() -> Result<SqlitePool, Box<dyn std::error::Error>> {
         .execute(&pool)
         .await
         .ok(); // Игнорируем ошибку если колонка уже есть
+
+    // Добавляем колонку visibility если её нет (для существующих БД)
+    sqlx::query("ALTER TABLE boards ADD COLUMN visibility TEXT")
+        .execute(&pool)
+        .await
+        .ok();
+
+    // Обновляем существующие доски на 'private'
+    sqlx::query("UPDATE boards SET visibility = 'private' WHERE visibility IS NULL")
+        .execute(&pool)
+        .await
+        .ok();
 
     // Создаём пользователя по умолчанию
     sqlx::query(

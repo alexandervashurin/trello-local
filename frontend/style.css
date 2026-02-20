@@ -523,6 +523,49 @@ body {
   overflow-wrap: break-word;
 }
 
+.role-badge {
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: #f0f0f0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 4px;
+}
+
+/* Invitations */
+.invitation-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #dfe1e6;
+  background: #fafbfc;
+  border-radius: var(--border-radius);
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.invitation-item:last-child {
+  border-bottom: none;
+}
+
+.add-invitation-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #dfe1e6;
+  flex-wrap: wrap;
+}
+
+.add-invitation-form select,
+.add-invitation-form input {
+  padding: 8px 12px;
+  border: 2px solid #dfe1e6;
+  border-radius: var(--border-radius);
+  font-size: 14px;
+}
+
 .add-member-form {
   display: flex;
   gap: 8px;

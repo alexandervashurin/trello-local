@@ -25,6 +25,7 @@ async fn init_db(pool: &SqlitePool) {
             title TEXT NOT NULL,
             owner_id INTEGER NOT NULL DEFAULT 1,
             is_shared BOOLEAN NOT NULL DEFAULT 0,
+            visibility TEXT NOT NULL DEFAULT 'private',
             FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
         );
         CREATE TABLE IF NOT EXISTS board_members (
@@ -49,6 +50,7 @@ async fn init_db(pool: &SqlitePool) {
             content TEXT,
             position REAL NOT NULL DEFAULT 0,
             done BOOLEAN NOT NULL DEFAULT 0,
+            due_date INTEGER,
             FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE
         );
         CREATE TABLE IF NOT EXISTS comments (

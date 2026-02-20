@@ -29,9 +29,9 @@ pub async fn extract_claims(
             if !header.starts_with("Bearer ") {
                 return Err((StatusCode::UNAUTHORIZED, "Неверный формат Authorization заголовка".to_string()));
             }
-            
+
             let token = header.trim_start_matches("Bearer ").trim();
-            
+
             match decode::<Claims>(
                 token,
                 &DecodingKey::from_secret(JWT_SECRET),
@@ -44,7 +44,7 @@ pub async fn extract_claims(
         None => None, // Токен не обязателен для некоторых эндпоинтов
     };
 
-    // Добавляем claims в extensions запроса
+    // Добавляем claims в Extension запроса
     if let Some(claims) = claims {
         request.extensions_mut().insert(claims);
     }

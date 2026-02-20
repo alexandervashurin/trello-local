@@ -36,10 +36,44 @@
       </div>
       <div class="add-member-form">
         <input type="text" id="new-member-username" placeholder="Имя пользователя" autocomplete="off">
+        <select id="new-member-role" style="margin-left:8px;">
+          <option value="viewer">👁️ Наблюдатель</option>
+          <option value="member" selected>✏️ Участник</option>
+          <option value="editor">📝 Редактор</option>
+          <option value="admin">⭐ Админ</option>
+        </select>
         <button class="btn btn-primary" onclick="addMember()">Добавить</button>
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeMembersModal()">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно приглашений -->
+  <div id="invitations-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>🔗 Приглашения</h2>
+        <button class="modal-close" onclick="closeInvitationsModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="invitations-list">
+          <div class="loading">Загрузка...</div>
+        </div>
+      </div>
+      <div class="add-invitation-form">
+        <select id="invitation-role">
+          <option value="viewer">👁️ Наблюдатель</option>
+          <option value="member" selected>✏️ Участник</option>
+          <option value="editor">📝 Редактор</option>
+          <option value="admin">⭐ Админ</option>
+        </select>
+        <input type="number" id="invitation-expires" placeholder="Часов (0 = бессрочно)" min="0" value="24" style="margin-left:8px; width:150px;">
+        <button class="btn btn-primary" onclick="createInvitation()" style="margin-left:8px;">Создать</button>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeInvitationsModal()">Закрыть</button>
       </div>
     </div>
   </div>
@@ -206,6 +240,20 @@
     document.getElementById('activity-modal').addEventListener('click', function(e) {
       if (e.target === this) {
         closeActivityModal();
+      }
+    });
+
+    // Закрытие модального окна приглашений по клику вне его
+    document.getElementById('invitations-modal').addEventListener('click', function(e) {
+      if (e.target === this) {
+        closeInvitationsModal();
+      }
+    });
+
+    // Ctrl+Enter для создания приглашения
+    document.getElementById('invitation-role').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && e.ctrlKey) {
+        createInvitation();
       }
     });
   </script>

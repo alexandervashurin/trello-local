@@ -28,6 +28,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let frontend_dir = "/opt/trello-local/frontend";
     let index_html = "/opt/trello-local/frontend/index.html";
     let login_html = "/opt/trello-local/frontend/login.html";
+    let invite_html = "/opt/trello-local/frontend/invite.html";
 
     // API роуты с middleware
     let api_routes = Router::new()
@@ -42,6 +43,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/boards/:id", patch(controllers::boards::update_board).delete(controllers::boards::delete_board))
         .route("/boards/:board_id/members", get(controllers::boards::get_board_members).post(controllers::boards::add_board_member))
         .route("/boards/:board_id/members/:user_id", delete(controllers::boards::remove_board_member))
+        .route("/boards/:board_id/members/:user_id/role", get(controllers::boards::get_user_board_role))
+        .route("/boards/:board_id/invitations", get(controllers::boards::get_board_invitations).post(controllers::boards::create_invitation))
+        .route("/boards/:board_id/invitations/:token", delete(controllers::boards::delete_invitation))
+        .route("/invite/:token", post(controllers::boards::accept_invitation))
         .route("/users/:user_id/boards", get(controllers::boards::get_boards_for_user))
         // Списки
         .route("/boards/:board_id/lists", post(controllers::lists::create_list))
@@ -69,6 +74,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nest("/api", api_routes)
         // Страницы (Static Frontend)
         .nest_service("/login.html", ServeFile::new(login_html))
+        .nest_service("/invite.html", ServeFile::new(invite_html))
         .fallback_service(
             ServeDir::new(frontend_dir)
                 .fallback(ServeFile::new(index_html))

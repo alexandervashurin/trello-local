@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-axum = { version = "0.7", features = ["multipart"] }
+axum = { version = "0.7", features = ["multipart", "macros"] }
 tokio = { version = "1", features = ["full"] }
 tower-http = { version = "0.5", features = ["fs", "trace"] }
 tower = "0.4"
@@ -15,6 +15,8 @@ sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite"] }
 jsonwebtoken = "9"
 bcrypt = "0.15"
 chrono = "0.4"
+uuid = { version = "1", features = ["v4"] }
+axum-macros = "0.4"
 
 [dev-dependencies]
 axum = { version = "0.7", features = ["macros"] }

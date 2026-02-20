@@ -115,10 +115,12 @@ async function loadBoards() {
           <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
             <h3>${escapeHtml(board.title)}</h3>
             ${board.is_shared ? '<span class="board-badge">🌐 Общая</span>' : ''}
+            ${board.visibility === 'public' ? '<span class="board-badge" style="background:#22c55e;">🌍 Публичная</span>' : ''}
           </div>
           <div class="board-actions">
             <span class="members-count" title="Участники">👥 ${board.members.length}</span>
             <button class="btn btn-secondary" onclick="openMembersModal(${board.id})" title="Участники">👤</button>
+            <button class="btn btn-secondary" onclick="openInvitationsModal(${board.id})" title="Приглашения">🔗</button>
             <button class="btn btn-secondary" onclick="deleteBoard(${board.id})" title="Удалить доску">🗑️</button>
           </div>
         </div>
@@ -578,8 +580,14 @@ async function openMembersModal(boardId) {
     } else {
       membersList.innerHTML = members.map(m => `
         <div class="member-item">
-          <span><strong>${escapeHtml(m.username)}</strong></span>
-          <button class="btn btn-secondary" onclick="removeMember(${m.id})" style="padding:4px 10px;font-size:11px;">Удалить</button>
+          <span><strong>${escapeHtml(m.username)}</strong> <span class="role-badge">(${getRoleName(m.role)})</span></span>
+          <select onchange="changeMemberRole(${m.user_id}, this.value)" style="margin-left:8px;font-size:11px;">
+            <option value="viewer" ${m.role === 'viewer' ? 'selected' : ''}>👁️</option>
+            <option value="member" ${m.role === 'member' ? 'selected' : ''}>✏️</option>
+            <option value="editor" ${m.role === 'editor' ? 'selected' : ''}>📝</option>
+            <option value="admin" ${m.role === 'admin' ? 'selected' : ''}>⭐</option>
+          </select>
+          <button class="btn btn-secondary" onclick="removeMember(${m.user_id})" style="padding:4px 10px;font-size:11px;margin-left:8px;">Удалить</button>
         </div>
       `).join('');
     }
@@ -627,19 +635,38 @@ async function addMember() {
       userId = user.id;
     }
 
-    // Добавляем участника на доску
+    // Добавляем участника на доску с выбранной ролью
+    const roleSelect = document.getElementById('new-member-role');
+    const role = roleSelect.value;
+    
     await apiRequest(`/api/boards/${currentBoardId}/members`, {
       method: 'POST',
-      body: JSON.stringify({ user_id: userId, role: 'member' })
+      body: JSON.stringify({ user_id: userId, role: role })
     });
 
     usernameInput.value = '';
+    roleSelect.value = 'member';
     showToast('Участник добавлен', 'success');
     openMembersModal(currentBoardId);
     loadBoards();
   } catch (error) {
     console.error(error);
     showToast(error.message || 'Ошибка добавления участника', 'error');
+  }
+}
+
+async function changeMemberRole(userId, newRole) {
+  try {
+    await apiRequest(`/api/boards/${currentBoardId}/members`, {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId, role: newRole })
+    });
+
+    showToast('Роль изменена', 'success');
+    openMembersModal(currentBoardId);
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось изменить роль', 'error');
   }
 }
 
@@ -657,6 +684,117 @@ async function removeMember(userId) {
   } catch (error) {
     console.error(error);
     showToast('Не удалось удалить участника', 'error');
+  }
+}
+
+function getRoleName(role) {
+  const roles = {
+    'owner': '👑 Владелец',
+    'admin': '⭐ Админ',
+    'editor': '📝 Редактор',
+    'member': '✏️ Участник',
+    'viewer': '👁️ Наблюдатель'
+  };
+  return roles[role] || role;
+}
+
+// === Invitations Management ===
+async function openInvitationsModal(boardId) {
+  currentBoardId = boardId;
+  const modal = document.getElementById('invitations-modal');
+  const invitationsList = document.getElementById('invitations-list');
+
+  modal.classList.add('open');
+  invitationsList.innerHTML = '<div class="loading">Загрузка...</div>';
+
+  try {
+    const invitations = await apiRequest(`/api/boards/${boardId}/invitations`);
+
+    if (!invitations || invitations.length === 0) {
+      invitationsList.innerHTML = '<div class="empty-state"><p>Нет активных приглашений</p></div>';
+    } else {
+      invitationsList.innerHTML = invitations.map(inv => `
+        <div class="invitation-item">
+          <div style="flex:1;">
+            <div><strong>Роль:</strong> ${getRoleName(inv.role)}</div>
+            <div style="font-size:11px; color:var(--text-secondary);">Ссылка: <code style="background:#f0f0f0;padding:2px 4px;border-radius:3px;">${inv.invite_link}</code></div>
+            ${inv.expires_at ? `<div style="font-size:11px; color:var(--text-secondary);">Истекает: ${new Date(inv.expires_at * 1000).toLocaleString('ru-RU')}</div>` : '<div style="font-size:11px; color:var(--text-secondary);">Бессрочно</div>'}
+          </div>
+          <button class="btn btn-secondary" onclick="copyInviteLink('${inv.invite_link}')" style="padding:4px 10px;font-size:11px;">📋 Копировать</button>
+          <button class="btn btn-secondary" onclick="deleteInvitation(${boardId}, '${inv.token}')" style="padding:4px 10px;font-size:11px;margin-left:8px;">🗑️</button>
+        </div>
+      `).join('');
+    }
+  } catch (error) {
+    console.error(error);
+    invitationsList.innerHTML = '<div class="empty-state"><p>Ошибка загрузки приглашений</p></div>';
+    showToast('Не удалось загрузить приглашения', 'error');
+  }
+}
+
+function closeInvitationsModal() {
+  const modal = document.getElementById('invitations-modal');
+  modal.classList.remove('open');
+  currentBoardId = null;
+}
+
+async function createInvitation() {
+  const roleSelect = document.getElementById('invitation-role');
+  const expiresInput = document.getElementById('invitation-expires');
+  const role = roleSelect.value;
+  const expiresHours = parseInt(expiresInput.value) || 0;
+
+  try {
+    const invitation = await apiRequest(`/api/boards/${currentBoardId}/invitations`, {
+      method: 'POST',
+      body: JSON.stringify({ 
+        role: role, 
+        expires_in_hours: expiresHours > 0 ? expiresHours : null 
+      })
+    });
+
+    showToast('Приглашение создано', 'success');
+    
+    // Копируем ссылку в буфер
+    await navigator.clipboard.writeText(invitation.invite_link);
+    showToast('Ссылка скопирована в буфер обмена', 'success');
+    
+    openInvitationsModal(currentBoardId);
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось создать приглашение', 'error');
+  }
+}
+
+async function copyInviteLink(link) {
+  try {
+    await navigator.clipboard.writeText(link);
+    showToast('Ссылка скопирована в буфер обмена', 'success');
+  } catch (error) {
+    // Fallback для старых браузеров
+    const textarea = document.createElement('textarea');
+    textarea.value = link;
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+    showToast('Ссылка скопирована в буфер обмена', 'success');
+  }
+}
+
+async function deleteInvitation(boardId, token) {
+  if (!confirm('Отозвать приглашение?')) return;
+
+  try {
+    await apiRequest(`/api/boards/${boardId}/invitations/${token}`, {
+      method: 'DELETE'
+    });
+
+    showToast('Приглашение отозвано', 'success');
+    openInvitationsModal(currentBoardId);
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось отозвать приглашение', 'error');
   }
 }
 
@@ -1082,6 +1220,7 @@ window.openMembersModal = openMembersModal;
 window.closeMembersModal = closeMembersModal;
 window.addMember = addMember;
 window.removeMember = removeMember;
+window.changeMemberRole = changeMemberRole;
 window.openCommentsModal = openCommentsModal;
 window.closeCommentsModal = closeCommentsModal;
 window.addComment = addComment;
@@ -1098,6 +1237,11 @@ window.handleFileSelect = handleFileSelect;
 window.deleteAttachment = deleteAttachment;
 window.openActivityModal = openActivityModal;
 window.closeActivityModal = closeActivityModal;
+window.openInvitationsModal = openInvitationsModal;
+window.closeInvitationsModal = closeInvitationsModal;
+window.createInvitation = createInvitation;
+window.deleteInvitation = deleteInvitation;
+window.copyInviteLink = copyInviteLink;
 
 // === Init ===
 loadBoards();
