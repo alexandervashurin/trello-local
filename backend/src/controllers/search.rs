@@ -85,9 +85,9 @@ pub async fn search_cards_on_board(
         .await
     } else {
         // Сложный запрос с фильтрами
-        let mut sql = format!(
+        let mut sql = String::from(
             r#"
-            SELECT 
+            SELECT
                 c.id, c.title, c.content, c.done, c.due_date,
                 c.list_id, l.title as list_title,
                 l.board_id, b.title as board_title
@@ -98,28 +98,33 @@ pub async fn search_cards_on_board(
             "#,
         );
 
-        let mut binds: Vec<i64> = vec![board_id];
-        let mut bind_idx = 1;
-
-        if let Some(done) = query.done {
-            sql.push_str(&format!(" AND c.done = ?{}", bind_idx));
-            binds.push(done as i64);
-            bind_idx += 1;
+        if query.done.is_some() {
+            sql.push_str(" AND c.done = ?");
         }
 
-        if let Some(label_color) = &query.label_color {
-            sql.push_str(&format!(" AND EXISTS (SELECT 1 FROM labels lbl WHERE lbl.card_id = c.id AND lbl.color = ?{})", bind_idx));
-            // Для простоты используем строковый bind отдельно
+        if query.label_color.is_some() {
+            sql.push_str(" AND EXISTS (SELECT 1 FROM labels lbl WHERE lbl.card_id = c.id AND lbl.color = ?)");
         }
 
-        // Упрощённая версия - только базовые фильтры
+        if query.label_name.is_some() {
+            sql.push_str(" AND EXISTS (SELECT 1 FROM labels lbl WHERE lbl.card_id = c.id AND lbl.name = ?)");
+        }
+
         sql.push_str(" ORDER BY c.position, c.id");
 
         let mut query_builder = sqlx::query_as::<_, (i64, String, Option<String>, bool, Option<i64>, i64, String, i64, String)>(&sql);
         query_builder = query_builder.bind(board_id);
-        
+
         if let Some(done) = query.done {
             query_builder = query_builder.bind(done);
+        }
+
+        if let Some(label_color) = &query.label_color {
+            query_builder = query_builder.bind(label_color);
+        }
+
+        if let Some(label_name) = &query.label_name {
+            query_builder = query_builder.bind(label_name);
         }
 
         query_builder.fetch_all(&pool).await
