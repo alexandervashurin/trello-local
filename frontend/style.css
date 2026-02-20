@@ -516,6 +516,66 @@ body {
   font-size: 14px;
 }
 
+/* Comments List */
+.comment-item {
+  padding: 12px;
+  border-bottom: 1px solid #dfe1e6;
+  background: #fafbfc;
+  border-radius: var(--border-radius);
+  margin-bottom: 8px;
+}
+
+.comment-item:last-child {
+  border-bottom: none;
+}
+
+.comment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.comment-header strong {
+  color: var(--text-primary);
+}
+
+.comment-date {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.comment-content {
+  font-size: 14px;
+  color: var(--text-primary);
+  line-height: 1.5;
+  word-wrap: break-word;
+}
+
+.comment-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.add-comment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #dfe1e6;
+}
+
+.add-comment-form textarea {
+  padding: 8px 12px;
+  border: 2px solid #dfe1e6;
+  border-radius: var(--border-radius);
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+}
+
 /* Toast Notifications */
 .toast-container {
   position: fixed;

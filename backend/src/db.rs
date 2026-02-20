@@ -55,6 +55,15 @@ pub async fn connect() -> Result<SqlitePool, Box<dyn std::error::Error>> {
             done BOOLEAN NOT NULL DEFAULT 0,
             FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE
         );
+        CREATE TABLE IF NOT EXISTS comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            card_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            content TEXT NOT NULL,
+            created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+            FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
         "#,
     )
     .execute(&pool)

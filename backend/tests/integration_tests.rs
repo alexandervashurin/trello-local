@@ -51,6 +51,15 @@ async fn init_db(pool: &SqlitePool) {
             done BOOLEAN NOT NULL DEFAULT 0,
             FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE
         );
+        CREATE TABLE IF NOT EXISTS comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            card_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            content TEXT NOT NULL,
+            created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+            FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
         "#,
     )
     .execute(pool)
@@ -289,4 +298,50 @@ async fn test_search_boards() {
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn test_comments() {
+    let pool = create_test_pool().await;
+    init_db(&pool).await;
+
+    use backend::models::{Board, List, Card};
+
+    // Создаём доску, список и карточку
+    let board: Board = sqlx::query_as("INSERT INTO boards (title, owner_id, is_shared) VALUES ('Test', 1, 0) RETURNING *")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+    let list: List = sqlx::query_as("INSERT INTO lists (board_id, title, position) VALUES (?, 'Test List', 0) RETURNING *")
+        .bind(board.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+    let card: Card = sqlx::query_as("INSERT INTO cards (list_id, title, content, done) VALUES (?, 'Test Card', 'Content', 0) RETURNING *")
+        .bind(list.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+    // Создаём пользователя с паролем для JWT
+    let password_hash = bcrypt::hash("password123", 12).unwrap();
+    sqlx::query("INSERT INTO users (id, username, password_hash) VALUES (2, 'commenter', ?)")
+        .bind(password_hash)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    // Тест создания комментария напрямую через БД
+    let result: Result<(i64,), _> = sqlx::query_as(
+        "INSERT INTO comments (card_id, user_id, content) VALUES (?, ?, ?) RETURNING id"
+    )
+    .bind(card.id)
+    .bind(2)
+    .bind("Тестовый комментарий")
+    .fetch_one(&pool)
+    .await;
+
+    assert!(result.is_ok());
 }

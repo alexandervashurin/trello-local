@@ -44,6 +44,28 @@
     </div>
   </div>
 
+  <!-- Модальное окно комментариев -->
+  <div id="comments-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>💬 Комментарии</h2>
+        <button class="modal-close" onclick="closeCommentsModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="comments-list">
+          <div class="loading">Загрузка...</div>
+        </div>
+      </div>
+      <div class="add-comment-form">
+        <textarea id="new-comment-content" placeholder="Напишите комментарий..." rows="3" autocomplete="off"></textarea>
+        <button class="btn btn-primary" onclick="addComment()">Отправить</button>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeCommentsModal()">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast контейнер -->
   <div class="toast-container" id="toast-container"></div>
 
@@ -72,10 +94,24 @@
       }
     });
 
+    // Закрытие модального окна комментариев по клику вне его
+    document.getElementById('comments-modal').addEventListener('click', function(e) {
+      if (e.target === this) {
+        closeCommentsModal();
+      }
+    });
+
     // Enter для добавления участника
     document.getElementById('new-member-username').addEventListener('keypress', function(e) {
       if (e.key === 'Enter') {
         addMember();
+      }
+    });
+
+    // Ctrl+Enter для добавления комментария
+    document.getElementById('new-comment-content').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && e.ctrlKey) {
+        addComment();
       }
     });
   </script>

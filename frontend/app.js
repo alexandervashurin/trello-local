@@ -5,6 +5,7 @@ let draggedCard = null;
 let draggedFromList = null;
 let searchQuery = '';
 let currentBoardId = null;
+let currentCardId = null;
 let isLoading = false;
 
 // === DOM Elements ===
@@ -143,6 +144,7 @@ async function loadBoards() {
                         </span>
                       </label>
                       <div class="card-actions">
+                        <button class="btn btn-secondary" onclick="openCommentsModal(${card.id})" title="Комментарии" style="padding:2px 6px;font-size:10px;">💬</button>
                         <button class="btn btn-secondary" onclick="deleteCard(${card.id})" style="padding:2px 6px;font-size:10px;" title="Удалить">🗑️</button>
                       </div>
                     </div>
@@ -572,7 +574,7 @@ async function openMembersModal(boardId) {
         </div>
       `).join('');
     }
-    
+
     // Focus on input
     setTimeout(() => {
       document.getElementById('new-member-username').focus();
@@ -594,7 +596,7 @@ function closeMembersModal() {
 async function addMember() {
   const usernameInput = document.getElementById('new-member-username');
   const username = usernameInput.value.trim();
-  
+
   if (!username) {
     showToast('Введите имя пользователя', 'error');
     return;
@@ -649,6 +651,117 @@ async function removeMember(userId) {
   }
 }
 
+// === Comments Management ===
+async function openCommentsModal(cardId) {
+  currentCardId = cardId;
+  const modal = document.getElementById('comments-modal');
+  const commentsList = document.getElementById('comments-list');
+
+  modal.classList.add('open');
+  commentsList.innerHTML = '<div class="loading">Загрузка...</div>';
+
+  try {
+    const comments = await apiRequest(`/api/cards/${cardId}/comments`);
+
+    if (!comments || comments.length === 0) {
+      commentsList.innerHTML = '<div class="empty-state"><p>Нет комментариев</p></div>';
+    } else {
+      const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
+      commentsList.innerHTML = comments.map(c => `
+        <div class="comment-item">
+          <div class="comment-header">
+            <strong>${escapeHtml(c.username)}</strong>
+            <span class="comment-date">${new Date(c.created_at * 1000).toLocaleString('ru-RU')}</span>
+          </div>
+          <div class="comment-content">${escapeHtml(c.content)}</div>
+          ${c.user_id === currentUser?.user_id ? `
+          <div class="comment-actions">
+            <button class="btn btn-secondary" onclick="editComment(${c.id})" style="padding:2px 8px;font-size:11px;">✏️</button>
+            <button class="btn btn-secondary" onclick="deleteComment(${c.id})" style="padding:2px 8px;font-size:11px;">🗑️</button>
+          </div>` : ''}
+        </div>
+      `).join('');
+    }
+
+    // Focus on textarea
+    setTimeout(() => {
+      document.getElementById('new-comment-content').focus();
+    }, 100);
+  } catch (error) {
+    console.error(error);
+    commentsList.innerHTML = '<div class="empty-state"><p>Ошибка загрузки комментариев</p></div>';
+    showToast('Не удалось загрузить комментарии', 'error');
+  }
+}
+
+function closeCommentsModal() {
+  const modal = document.getElementById('comments-modal');
+  modal.classList.remove('open');
+  currentCardId = null;
+  document.getElementById('new-comment-content').value = '';
+}
+
+async function addComment() {
+  const contentInput = document.getElementById('new-comment-content');
+  const content = contentInput.value.trim();
+
+  if (!content) {
+    showToast('Введите текст комментария', 'error');
+    return;
+  }
+
+  try {
+    await apiRequest(`/api/cards/${currentCardId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ content })
+    });
+
+    contentInput.value = '';
+    showToast('Комментарий добавлен', 'success');
+    openCommentsModal(currentCardId);
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось добавить комментарий', 'error');
+  }
+}
+
+async function deleteComment(commentId) {
+  if (!confirm('Удалить комментарий?')) return;
+
+  try {
+    await apiRequest(`/api/comments/${commentId}`, { method: 'DELETE' });
+    showToast('Комментарий удалён', 'success');
+    openCommentsModal(currentCardId);
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось удалить комментарий', 'error');
+  }
+}
+
+async function editComment(commentId) {
+  const commentEl = document.querySelector(`.comment-item:nth-child(${commentId})`);
+  const contentDiv = commentEl?.querySelector('.comment-content');
+  if (!contentDiv) return;
+
+  const currentContent = contentDiv.textContent;
+  const newContent = prompt('Редактировать комментарий:', currentContent);
+  
+  if (newContent === null || newContent.trim() === '') return;
+
+  try {
+    await apiRequest(`/api/comments/${commentId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ content: newContent.trim() })
+    });
+
+    showToast('Комментарий обновлён', 'success');
+    openCommentsModal(currentCardId);
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось обновить комментарий', 'error');
+  }
+}
+
 // === Export Functions for Inline Handlers ===
 window.deleteBoard = deleteBoard;
 window.deleteList = deleteList;
@@ -667,6 +780,11 @@ window.openMembersModal = openMembersModal;
 window.closeMembersModal = closeMembersModal;
 window.addMember = addMember;
 window.removeMember = removeMember;
+window.openCommentsModal = openCommentsModal;
+window.closeCommentsModal = closeCommentsModal;
+window.addComment = addComment;
+window.deleteComment = deleteComment;
+window.editComment = editComment;
 window.logout = logout;
 
 // === Init ===

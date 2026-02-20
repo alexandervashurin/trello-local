@@ -49,6 +49,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Карточки
         .route("/lists/:list_id/cards", post(controllers::cards::create_card))
         .route("/cards/:id", patch(controllers::cards::update_card).delete(controllers::cards::delete_card))
+        // Комментарии
+        .route("/cards/:card_id/comments", get(controllers::comments::get_comments).post(controllers::comments::create_comment))
+        .route("/comments/:id", patch(controllers::comments::update_comment).delete(controllers::comments::delete_comment))
         // Применяем middleware для извлечения JWT claims
         .layer(from_fn_with_state(pool.clone(), middleware::auth::extract_claims));
 
