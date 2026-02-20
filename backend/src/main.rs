@@ -4,18 +4,24 @@ pub mod db;
 pub mod models;
 pub mod controllers;
 pub mod views;
+pub mod middleware;
 
 use axum::{
     routing::{get, post, patch, delete},
     Router,
 };
+use axum::middleware::from_fn_with_state;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
 use tokio::signal;
 use tower_http::services::{ServeDir, ServeFile};
+use tower_http::trace::TraceLayer;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Инициализация tracing
+    tracing_subscriber::fmt::init();
+
     let pool = db::connect().await?;
 
     // Абсолютные пути для frontend
@@ -23,31 +29,39 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let index_html = "/opt/trello-local/frontend/index.html";
     let login_html = "/opt/trello-local/frontend/login.html";
 
+    // API роуты с middleware
+    let api_routes = Router::new()
+        // Auth (без аутентификации)
+        .route("/auth/register", post(controllers::auth::register))
+        .route("/auth/login", post(controllers::auth::login))
+        // Пользователи
+        .route("/users", get(controllers::users::get_users).post(controllers::users::create_user))
+        .route("/users/:id", get(controllers::users::get_user))
+        // Доски
+        .route("/boards", get(controllers::boards::get_boards).post(controllers::boards::create_board))
+        .route("/boards/:id", patch(controllers::boards::update_board).delete(controllers::boards::delete_board))
+        .route("/boards/:board_id/members", get(controllers::boards::get_board_members).post(controllers::boards::add_board_member))
+        .route("/boards/:board_id/members/:user_id", delete(controllers::boards::remove_board_member))
+        .route("/users/:user_id/boards", get(controllers::boards::get_boards_for_user))
+        // Списки
+        .route("/boards/:board_id/lists", post(controllers::lists::create_list))
+        .route("/lists/:id", patch(controllers::lists::update_list).delete(controllers::lists::delete_list))
+        // Карточки
+        .route("/lists/:list_id/cards", post(controllers::cards::create_card))
+        .route("/cards/:id", patch(controllers::cards::update_card).delete(controllers::cards::delete_card))
+        // Применяем middleware для извлечения JWT claims
+        .layer(from_fn_with_state(pool.clone(), middleware::auth::extract_claims));
+
     let app = Router::new()
-        // Auth (Authentication Controller)
-        .route("/api/auth/register", post(controllers::auth::register))
-        .route("/api/auth/login", post(controllers::auth::login))
-        // Пользователи (Users Controller)
-        .route("/api/users", get(controllers::users::get_users).post(controllers::users::create_user))
-        .route("/api/users/:id", get(controllers::users::get_user))
-        // Доски (Boards Controller)
-        .route("/api/boards", get(controllers::boards::get_boards).post(controllers::boards::create_board))
-        .route("/api/boards/:id", patch(controllers::boards::update_board).delete(controllers::boards::delete_board))
-        .route("/api/boards/:board_id/members", get(controllers::boards::get_board_members).post(controllers::boards::add_board_member))
-        .route("/api/boards/:board_id/members/:user_id", delete(controllers::boards::remove_board_member))
-        .route("/api/users/:user_id/boards", get(controllers::boards::get_boards_for_user))
-        // Списки (Lists Controller)
-        .route("/api/boards/:board_id/lists", post(controllers::lists::create_list))
-        .route("/api/lists/:id", patch(controllers::lists::update_list).delete(controllers::lists::delete_list))
-        // Карточки (Cards Controller)
-        .route("/api/lists/:list_id/cards", post(controllers::cards::create_card))
-        .route("/api/cards/:id", patch(controllers::cards::update_card).delete(controllers::cards::delete_card))
+        .nest("/api", api_routes)
         // Страницы (Static Frontend)
         .nest_service("/login.html", ServeFile::new(login_html))
         .fallback_service(
             ServeDir::new(frontend_dir)
                 .fallback(ServeFile::new(index_html))
         )
+        // Логирование запросов
+        .layer(TraceLayer::new_for_http())
         .with_state(pool);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
