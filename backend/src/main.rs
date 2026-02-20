@@ -83,6 +83,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/boards/:id/export/json", get(controllers::export::export_board_json))
         .route("/boards/:id/export/csv", get(controllers::export::export_board_csv))
         .route("/boards/:id/stats", get(controllers::export::get_board_stats))
+        // Чек-листы
+        .route("/cards/:card_id/checklists", get(controllers::checklists::get_card_checklists).post(controllers::checklists::create_checklist))
+        .route("/cards/:card_id/checklists/:checklist_id", delete(controllers::checklists::delete_checklist))
+        .route("/cards/:card_id/checklists/:checklist_id/items", post(controllers::checklists::create_checklist_item))
+        .route("/cards/:card_id/checklists/:checklist_id/items/:item_id", patch(controllers::checklists::update_checklist_item).delete(controllers::checklists::delete_checklist_item))
+        // Исполнители
+        .route("/cards/:card_id/assignees", get(controllers::checklists::get_card_assignees).post(controllers::checklists::add_card_assignee))
+        .route("/cards/:card_id/assignees/:user_id", delete(controllers::checklists::remove_card_assignee))
         // Применяем middleware для извлечения JWT claims
         .layer(from_fn_with_state(pool.clone(), middleware::auth::extract_claims))
         // Применяем rate limiter

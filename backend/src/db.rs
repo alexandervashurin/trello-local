@@ -121,8 +121,37 @@ pub async fn connect() -> Result<SqlitePool, Box<dyn std::error::Error>> {
             last_activity INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         );
+        CREATE TABLE IF NOT EXISTS checklists (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            card_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            position INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+            FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS checklist_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            checklist_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            done BOOLEAN NOT NULL DEFAULT 0,
+            position INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+            FOREIGN KEY (checklist_id) REFERENCES checklists(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS card_assignees (
+            card_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            assigned_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+            assigned_by INTEGER NOT NULL,
+            PRIMARY KEY (card_id, user_id),
+            FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (assigned_by) REFERENCES users(id) ON DELETE CASCADE
+        );
         CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON sessions(token_hash);
         CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
+        CREATE INDEX IF NOT EXISTS idx_checklists_card_id ON checklists(card_id);
+        CREATE INDEX IF NOT EXISTS idx_checklist_items_checklist_id ON checklist_items(checklist_id);
         "#,
     )
     .execute(&pool)

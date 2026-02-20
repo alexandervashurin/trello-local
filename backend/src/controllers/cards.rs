@@ -177,7 +177,7 @@ pub async fn delete_card(
 }
 
 /// Вспомогательная функция для получения board_id по card_id
-async fn get_board_id_by_card_id(pool: &SqlitePool, card_id: i64) -> Option<i64> {
+pub async fn get_board_id_by_card_id(pool: &SqlitePool, card_id: i64) -> Option<i64> {
     let result: Option<(i64,)> = sqlx::query_as(
         "SELECT b.id FROM boards b INNER JOIN lists l ON b.id = l.board_id INNER JOIN cards c ON l.id = c.list_id WHERE c.id = ?"
     )

@@ -44,6 +44,42 @@ pub struct ActivityLog {
     pub created_at: i64,
 }
 
+#[derive(Serialize, FromRow, Clone, Debug)]
+pub struct Checklist {
+    pub id: i64,
+    pub card_id: i64,
+    pub title: String,
+    pub position: i64,
+    pub created_at: i64,
+}
+
+#[derive(Serialize, FromRow, Clone, Debug)]
+pub struct ChecklistItem {
+    pub id: i64,
+    pub checklist_id: i64,
+    pub title: String,
+    pub done: bool,
+    pub position: i64,
+    pub created_at: i64,
+}
+
+#[derive(Serialize, FromRow, Clone, Debug)]
+pub struct CardAssignee {
+    pub card_id: i64,
+    pub user_id: i64,
+    pub assigned_at: i64,
+    pub assigned_by: i64,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct CardAssigneeWithUser {
+    pub card_id: i64,
+    pub user_id: i64,
+    pub username: String,
+    pub assigned_at: i64,
+    pub assigned_by: i64,
+}
+
 #[derive(Deserialize)]
 pub struct CreateCard {
     pub title: String,
@@ -71,4 +107,25 @@ pub struct CreateLabel {
 pub struct UpdateLabel {
     pub name: Option<String>,
     pub color: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct CreateChecklist {
+    pub title: String,
+}
+
+#[derive(Deserialize)]
+pub struct CreateChecklistItem {
+    pub title: String,
+}
+
+#[derive(Deserialize)]
+pub struct UpdateChecklistItem {
+    pub title: Option<String>,
+    pub done: Option<bool>,
+}
+
+#[derive(Deserialize)]
+pub struct AddCardAssignee {
+    pub user_id: i64,
 }

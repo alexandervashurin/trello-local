@@ -7,3 +7,4 @@ pub mod comments;
 pub mod attachments;
 pub mod sessions;
 pub mod export;
+pub mod checklists;

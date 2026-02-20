@@ -960,7 +960,13 @@ async function openCardModal(cardId, boardId) {
     
     // Загружаем историю
     await loadBoardActivity(boardId);
-    
+
+    // Загружаем чек-листы
+    await loadCardChecklists(cardId);
+
+    // Загружаем исполнителей
+    await loadCardAssignees(cardId);
+
     modal.classList.add('open');
   } catch (error) {
     console.error(error);
@@ -1417,6 +1423,193 @@ function closeBoardStats() {
   modal.classList.remove('open');
 }
 
+// === Checklist Functions ===
+async function loadCardChecklists(cardId) {
+  const container = document.getElementById('card-checklists');
+
+  try {
+    const checklists = await apiRequest(`/api/cards/${cardId}/checklists`);
+
+    if (!checklists || checklists.length === 0) {
+      container.innerHTML = '<div class="empty-state" style="padding:10px;"><p>Нет чек-листов</p></div>';
+    } else {
+      container.innerHTML = checklists.map(cl => {
+        const total = cl.items.length;
+        const done = cl.items.filter(i => i.done).length;
+        const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+
+        return `
+        <div class="checklist-item-container">
+          <div class="checklist-header">
+            <div style="display:flex; align-items:center; gap:8px; flex:1;">
+              <span style="font-weight:600;">${escapeHtml(cl.title)}</span>
+              <span style="font-size:11px; color:var(--text-secondary);">${done}/${total} (${percent}%)</span>
+            </div>
+            <div style="display:flex; gap:4px;">
+              <button class="btn btn-secondary btn-sm" onclick="addChecklistItem(${cl.id}, ${cardId})" title="Добавить элемент">➕</button>
+              <button class="btn btn-secondary btn-sm" onclick="deleteChecklist(${cardId}, ${cl.id})" title="Удалить чек-лист">🗑️</button>
+            </div>
+          </div>
+          <div class="checklist-progress" style="width:100%; height:4px; background:#dfe1e6; border-radius:2px; margin:8px 0;">
+            <div style="width:${percent}%; height:100%; background:var(--success-color); border-radius:2px; transition:width 0.3s;"></div>
+          </div>
+          <div class="checklist-items">
+            ${cl.items.map(item => `
+              <div class="checklist-item ${item.done ? 'checklist-item-done' : ''}">
+                <input type="checkbox" ${item.done ? 'checked' : ''} onchange="toggleChecklistItem(${cardId}, ${cl.id}, ${item.id}, this.checked)">
+                <span style="flex:1; ${item.done ? 'text-decoration:line-through; color:var(--text-secondary);' : ''}">${escapeHtml(item.title)}</span>
+                <button class="btn btn-secondary btn-sm" onclick="deleteChecklistItem(${cardId}, ${cl.id}, ${item.id})" style="padding:2px 6px;">✕</button>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+      }).join('');
+    }
+  } catch (error) {
+    container.innerHTML = '<div class="empty-state" style="padding:10px;"><p>Ошибка загрузки</p></div>';
+  }
+}
+
+async function createChecklist(cardId) {
+  const title = prompt('Название чек-листа:');
+  if (!title || title.trim() === '') return;
+
+  try {
+    await apiRequest(`/api/cards/${cardId}/checklists`, {
+      method: 'POST',
+      body: JSON.stringify({ title: title.trim() })
+    });
+    showToast('Чек-лист создан', 'success');
+    loadCardChecklists(cardId);
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось создать чек-лист', 'error');
+  }
+}
+
+async function deleteChecklist(cardId, checklistId) {
+  if (!confirm('Удалить чек-лист?')) return;
+
+  try {
+    await apiRequest(`/api/cards/${cardId}/checklists/${checklistId}`, { method: 'DELETE' });
+    showToast('Чек-лист удалён', 'success');
+    loadCardChecklists(cardId);
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось удалить чек-лист', 'error');
+  }
+}
+
+async function addChecklistItem(checklistId, cardId) {
+  const title = prompt('Название элемента:');
+  if (!title || title.trim() === '') return;
+
+  try {
+    await apiRequest(`/api/cards/${cardId}/checklists/${checklistId}/items`, {
+      method: 'POST',
+      body: JSON.stringify({ title: title.trim() })
+    });
+    showToast('Элемент добавлен', 'success');
+    loadCardChecklists(cardId);
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось добавить элемент', 'error');
+  }
+}
+
+async function toggleChecklistItem(cardId, checklistId, itemId, done) {
+  try {
+    await apiRequest(`/api/cards/${cardId}/checklists/${checklistId}/items/${itemId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ done })
+    });
+    loadCardChecklists(cardId);
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось обновить элемент', 'error');
+  }
+}
+
+async function deleteChecklistItem(cardId, checklistId, itemId) {
+  if (!confirm('Удалить элемент?')) return;
+
+  try {
+    await apiRequest(`/api/cards/${cardId}/checklists/${checklistId}/items/${itemId}`, { method: 'DELETE' });
+    showToast('Элемент удалён', 'success');
+    loadCardChecklists(cardId);
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось удалить элемент', 'error');
+  }
+}
+
+// === Assignee Functions ===
+async function loadCardAssignees(cardId) {
+  const container = document.getElementById('card-assignees');
+
+  try {
+    const assignees = await apiRequest(`/api/cards/${cardId}/assignees`);
+
+    if (!assignees || assignees.length === 0) {
+      container.innerHTML = '<div class="empty-state" style="padding:10px;"><p>Нет исполнителей</p></div>';
+    } else {
+      container.innerHTML = `
+        <div class="assignees-list">
+          ${assignees.map(a => `
+            <div class="assignee-item">
+              <span style="font-weight:500;">👤 ${escapeHtml(a.username)}</span>
+              <button class="btn btn-secondary btn-sm" onclick="removeAssignee(${cardId}, ${a.user_id})" style="padding:2px 6px;">✕</button>
+            </div>
+          `).join('')}
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="addAssignee(${cardId})" style="margin-top:8px;">➕ Добавить исполнителя</button>
+      `;
+    }
+  } catch (error) {
+    container.innerHTML = '<div class="empty-state" style="padding:10px;"><p>Ошибка загрузки</p></div>';
+  }
+}
+
+async function addAssignee(cardId) {
+  const username = prompt('Введите имя пользователя для назначения:');
+  if (!username || username.trim() === '') return;
+
+  try {
+    // Ищем пользователя
+    const users = await apiRequest(`/api/users?username=${encodeURIComponent(username.trim())}`);
+    if (!users || users.length === 0) {
+      showToast('Пользователь не найден', 'error');
+      return;
+    }
+
+    const userId = users[0].id;
+
+    await apiRequest(`/api/cards/${cardId}/assignees`, {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId })
+    });
+    showToast('Исполнитель назначен', 'success');
+    loadCardAssignees(cardId);
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось назначить исполнителя', 'error');
+  }
+}
+
+async function removeAssignee(cardId, userId) {
+  if (!confirm('Удалить исполнителя?')) return;
+
+  try {
+    await apiRequest(`/api/cards/${cardId}/assignees/${userId}`, { method: 'DELETE' });
+    showToast('Исполнитель удалён', 'success');
+    loadCardAssignees(cardId);
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось удалить исполнителя', 'error');
+  }
+}
+
 // === Export Functions for Inline Handlers ===
 window.deleteBoard = deleteBoard;
 window.deleteList = deleteList;
@@ -1468,6 +1661,15 @@ window.exportBoardJSON = exportBoardJSON;
 window.exportBoardCSV = exportBoardCSV;
 window.openBoardStats = openBoardStats;
 window.closeBoardStats = closeBoardStats;
+window.loadCardChecklists = loadCardChecklists;
+window.createChecklist = createChecklist;
+window.deleteChecklist = deleteChecklist;
+window.addChecklistItem = addChecklistItem;
+window.toggleChecklistItem = toggleChecklistItem;
+window.deleteChecklistItem = deleteChecklistItem;
+window.loadCardAssignees = loadCardAssignees;
+window.addAssignee = addAssignee;
+window.removeAssignee = removeAssignee;
 
 // === Init ===
 loadBoards();
