@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Принятие приглашения - Trello Local</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .invite-container {
+      max-width: 500px;
+      margin: 100px auto;
+      padding: 32px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+      text-align: center;
+    }
+    .invite-icon {
+      font-size: 64px;
+      margin-bottom: 16px;
+    }
+    .invite-title {
+      font-size: 24px;
+      margin-bottom: 8px;
+      color: #172b4d;
+    }
+    .invite-message {
+      color: #6b778c;
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+    .invite-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="invite-container">
+    <div class="invite-icon">🎉</div>
+    <h1 class="invite-title">Приглашение на доску</h1>
+    <div id="invite-content">
+      <p class="invite-message">Обработка приглашения...</p>
+    </div>
+  </div>
+
+  <script>
+    async function handleInvitation() {
+      const token = window.location.pathname.split('/').pop();
+      const contentDiv = document.getElementById('invite-content');
+      
+      if (!token || token === 'invite.html') {
+        contentDiv.innerHTML = '<p class="invite-message">❌ Неверная ссылка приглашения</p>';
+        return;
+      }
+
+      const authToken = localStorage.getItem('token');
+      
+      if (!authToken) {
+        // Нет авторизации - перенаправляем на вход с возвратом
+        localStorage.setItem('invite_redirect', token);
+        window.location.href = '/login.html';
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/invite/${token}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          }
+        });
+
+        if (response.ok) {
+          contentDiv.innerHTML = `
+            <p class="invite-message" style="color: #61bd4f;">✅ Вы успешно присоединились к доске!</p>
+            <div class="invite-actions">
+              <a href="/" class="btn btn-primary">Перейти к доскам</a>
+            </div>
+          `;
+        } else {
+          const error = await response.json();
+          contentDiv.innerHTML = `
+            <p class="invite-message" style="color: #eb5a46;">❌ ${error.error || 'Ошибка принятия приглашения'}</p>
+            <div class="invite-actions">
+              <a href="/" class="btn btn-secondary">На главную</a>
+            </div>
+          `;
+        }
+      } catch (error) {
+        console.error(error);
+        contentDiv.innerHTML = `
+          <p class="invite-message" style="color: #eb5a46;">❌ Ошибка соединения с сервером</p>
+          <div class="invite-actions">
+            <a href="/" class="btn btn-secondary">На главную</a>
+          </div>
+        `;
+      }
+    }
+
+    // Обработка после логина
+    function checkInviteRedirect() {
+      const redirectToken = localStorage.getItem('invite_redirect');
+      if (redirectToken) {
+        localStorage.removeItem('invite_redirect');
+        window.location.href = `/invite/${redirectToken}`;
+        return true;
+      }
+      return false;
+    }
+
+    // Проверка авторизации
+    const token = localStorage.getItem('token');
+    if (!token) {
+      const redirectToken = window.location.pathname.split('/').pop();
+      if (redirectToken && redirectToken !== 'invite.html') {
+        localStorage.setItem('invite_redirect', redirectToken);
+        window.location.href = '/login.html';
+      }
+    } else {
+      handleInvitation();
+    }
+  </script>
+</body>
+</html>
