@@ -8,3 +8,4 @@ pub mod attachments;
 pub mod sessions;
 pub mod export;
 pub mod checklists;
+pub mod search;

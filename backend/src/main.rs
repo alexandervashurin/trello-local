@@ -91,6 +91,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Исполнители
         .route("/cards/:card_id/assignees", get(controllers::checklists::get_card_assignees).post(controllers::checklists::add_card_assignee))
         .route("/cards/:card_id/assignees/:user_id", delete(controllers::checklists::remove_card_assignee))
+        // Поиск и фильтрация
+        .route("/boards/:id/search", get(controllers::search::search_cards_on_board))
+        .route("/boards/:id/labels", get(controllers::search::get_board_labels))
+        .route("/search/cards", get(controllers::search::global_card_search))
         // Применяем middleware для извлечения JWT claims
         .layer(from_fn_with_state(pool.clone(), middleware::auth::extract_claims))
         // Применяем rate limiter

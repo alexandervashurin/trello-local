@@ -242,6 +242,24 @@
     </div>
   </div>
 
+  <!-- Модальное окно фильтра по меткам -->
+  <div id="label-filter-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>🏷️ Фильтр по меткам</h2>
+        <button class="modal-close" onclick="closeLabelFilter()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="label-filter-content">
+          <div class="loading">Загрузка меток...</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeLabelFilter()">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast контейнер -->
   <div class="toast-container" id="toast-container"></div>
 
@@ -331,6 +349,13 @@
     document.getElementById('stats-modal').addEventListener('click', function(e) {
       if (e.target === this) {
         closeBoardStats();
+      }
+    });
+
+    // Закрытие модального окна фильтра по меткам по клику вне его
+    document.getElementById('label-filter-modal').addEventListener('click', function(e) {
+      if (e.target === this) {
+        closeLabelFilter();
       }
     });
 

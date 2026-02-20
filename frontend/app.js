@@ -127,6 +127,11 @@ async function loadBoards() {
             <button class="btn btn-secondary" onclick="deleteBoard(${board.id})" title="Удалить доску">🗑️</button>
           </div>
         </div>
+        <div class="board-search-bar" data-board-id="${board.id}">
+          <input type="text" class="board-search-input" placeholder="🔍 Поиск карточек..." oninput="handleBoardSearch(${board.id}, this.value)" style="padding:6px 10px; border:1px solid #dfe1e6; border-radius:4px; font-size:13px; width:250px;">
+          <button class="btn btn-secondary btn-sm" onclick="openLabelFilter(${board.id})" title="Фильтр по меткам" style="padding:4px 8px; margin-left:8px;">🏷️</button>
+          <button class="btn btn-secondary btn-sm" onclick="clearBoardSearch(${board.id})" title="Очистить поиск" style="padding:4px 8px;">✕</button>
+        </div>
         <div class="lists-container">
           ${board.lists.map(list => `
             <div class="list" data-list-id="${list.id}" data-list-index="${board.lists.indexOf(list)}">
@@ -1610,7 +1615,163 @@ async function removeAssignee(cardId, userId) {
   }
 }
 
-// === Export Functions for Inline Handlers ===
+// === Search and Filter Functions ===
+async function handleBoardSearch(boardId, query) {
+  const searchResultsContainer = document.querySelector(`.board-search-results[data-board-id="${boardId}"]`);
+  
+  if (!query || query.trim() === '') {
+    if (searchResultsContainer) searchResultsContainer.remove();
+    return;
+  }
+
+  try {
+    const results = await apiRequest(`/api/boards/${boardId}/search?q=${encodeURIComponent(query)}`);
+    
+    // Удаляем старую панель результатов
+    if (searchResultsContainer) searchResultsContainer.remove();
+    
+    // Создаём панель результатов
+    const resultsDiv = document.createElement('div');
+    resultsDiv.className = 'board-search-results';
+    resultsDiv.setAttribute('data-board-id', boardId);
+    resultsDiv.innerHTML = `
+      <div class="search-results-header">
+        <strong>🔍 Результаты поиска "${escapeHtml(query)}":</strong>
+        <span>${results.length} найдено</span>
+      </div>
+      <div class="search-results-list">
+        ${results.length === 0 ? '<div class="empty-state">Ничего не найдено</div>' : ''}
+        ${results.map(card => `
+          <div class="search-result-card" onclick="openCardModal(${card.id}, ${card.board_id})">
+            <div style="display:flex; justify-content:space-between; align-items:start;">
+              <div style="flex:1;">
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+                  <span style="font-size:11px; color:var(--text-secondary);">${escapeHtml(card.board_title)} / ${escapeHtml(card.list_title)}</span>
+                </div>
+                <strong>${escapeHtml(card.title)}</strong>
+                ${card.content ? `<p style="font-size:12px; color:var(--text-secondary); margin-top:4px;">${escapeHtml(card.content).substring(0, 100)}${card.content.length > 100 ? '...' : ''}</p>` : ''}
+                <div style="display:flex; gap:4px; margin-top:6px; flex-wrap:wrap;">
+                  ${(card.labels || []).map(l => `<span class="label-badge label-${l.color}" style="font-size:10px;">${escapeHtml(l.name)}</span>`).join('')}
+                </div>
+              </div>
+              ${card.done ? '<span style="color:var(--success-color); font-size:18px;">✅</span>' : ''}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    
+    // Вставляем после search bar
+    const searchBar = document.querySelector(`.board-search-bar[data-board-id="${boardId}"]`);
+    searchBar.parentNode.insertBefore(resultsDiv, searchBar.nextSibling);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+function clearBoardSearch(boardId) {
+  const searchInput = document.querySelector(`.board-search-bar[data-board-id="${boardId}"] .board-search-input`);
+  if (searchInput) searchInput.value = '';
+  
+  const resultsContainer = document.querySelector(`.board-search-results[data-board-id="${boardId}"]`);
+  if (resultsContainer) resultsContainer.remove();
+}
+
+async function openLabelFilter(boardId) {
+  try {
+    const labels = await apiRequest(`/api/boards/${boardId}/labels`);
+    
+    const modal = document.getElementById('label-filter-modal');
+    const filterContainer = document.getElementById('label-filter-content');
+    
+    modal.classList.add('open');
+    
+    if (!labels || labels.length === 0) {
+      filterContainer.innerHTML = '<div class="empty-state"><p>Нет меток на этой доске</p></div>';
+    } else {
+      filterContainer.innerHTML = `
+        <div class="label-filter-list">
+          ${labels.map(l => `
+            <div class="label-filter-item label-${l.color}" onclick="filterByLabel(${boardId}, '${l.color}', '${escapeJs(l.name)}')">
+              <span class="label-color-dot" style="background:${getLabelColorHex(l.color)}"></span>
+              <span>${escapeHtml(l.name)}</span>
+              <span style="font-size:11px; color:var(--text-secondary); margin-left:auto;">${l.color}</span>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось загрузить метки', 'error');
+  }
+}
+
+function closeLabelFilter() {
+  const modal = document.getElementById('label-filter-modal');
+  modal.classList.remove('open');
+}
+
+async function filterByLabel(boardId, color, name) {
+  try {
+    const results = await apiRequest(`/api/boards/${boardId}/search?label_color=${encodeURIComponent(color)}`);
+    
+    closeLabelFilter();
+    
+    // Показываем результаты в search results панели
+    const searchResultsContainer = document.querySelector(`.board-search-results[data-board-id="${boardId}"]`);
+    if (searchResultsContainer) searchResultsContainer.remove();
+    
+    const resultsDiv = document.createElement('div');
+    resultsDiv.className = 'board-search-results';
+    resultsDiv.setAttribute('data-board-id', boardId);
+    resultsDiv.innerHTML = `
+      <div class="search-results-header">
+        <strong>🏷️ Фильтр по метке "${escapeHtml(name)}" (${color}):</strong>
+        <span>${results.length} найдено</span>
+        <button class="btn btn-secondary btn-sm" onclick="clearBoardSearch(${boardId})" style="margin-left:auto;">✕ Очистить</button>
+      </div>
+      <div class="search-results-list">
+        ${results.length === 0 ? '<div class="empty-state">Ничего не найдено</div>' : ''}
+        ${results.map(card => `
+          <div class="search-result-card" onclick="openCardModal(${card.id}, ${card.board_id})">
+            <div style="display:flex; justify-content:space-between; align-items:start;">
+              <div style="flex:1;">
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+                  <span style="font-size:11px; color:var(--text-secondary);">${escapeHtml(card.board_title)} / ${escapeHtml(card.list_title)}</span>
+                </div>
+                <strong>${escapeHtml(card.title)}</strong>
+                ${card.content ? `<p style="font-size:12px; color:var(--text-secondary); margin-top:4px;">${escapeHtml(card.content).substring(0, 100)}${card.content.length > 100 ? '...' : ''}</p>` : ''}
+                <div style="display:flex; gap:4px; margin-top:6px; flex-wrap:wrap;">
+                  ${(card.labels || []).map(l => `<span class="label-badge label-${l.color}" style="font-size:10px;">${escapeHtml(l.name)}</span>`).join('')}
+                </div>
+              </div>
+              ${card.done ? '<span style="color:var(--success-color); font-size:18px;">✅</span>' : ''}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    
+    const searchBar = document.querySelector(`.board-search-bar[data-board-id="${boardId}"]`);
+    searchBar.parentNode.insertBefore(resultsDiv, searchBar.nextSibling);
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось применить фильтр', 'error');
+  }
+}
+
+function getLabelColorHex(color) {
+  const colors = {
+    'blue': '#0079bf',
+    'green': '#61bd4f',
+    'yellow': '#f2d600',
+    'red': '#eb5a46',
+    'purple': '#c377e0',
+    'orange': '#ff9f1a',
+  };
+  return colors[color] || '#0079bf';
+}
 window.deleteBoard = deleteBoard;
 window.deleteList = deleteList;
 window.deleteCard = deleteCard;
@@ -1670,6 +1831,12 @@ window.deleteChecklistItem = deleteChecklistItem;
 window.loadCardAssignees = loadCardAssignees;
 window.addAssignee = addAssignee;
 window.removeAssignee = removeAssignee;
+window.handleBoardSearch = handleBoardSearch;
+window.clearBoardSearch = clearBoardSearch;
+window.openLabelFilter = openLabelFilter;
+window.closeLabelFilter = closeLabelFilter;
+window.filterByLabel = filterByLabel;
+window.getLabelColorHex = getLabelColorHex;
 
 // === Init ===
 loadBoards();
