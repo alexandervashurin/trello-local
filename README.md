@@ -12,6 +12,7 @@
 - ✅ **Простота установки**: один бинарный файл + база данных
 - ✅ **Drag-and-drop**: перетаскивайте карточки между списками
 - ✅ **Статус выполнения**: помечайте задачи как "готово"
+- ✅ **Комментарии**: обсуждайте задачи в карточках
 - ✅ **Многоуровневая структура**: доски → списки → карточки
 - 🌐 **Доступ из любой точки локальной сети**
 - 👥 **Общие доски**: делитесь досками с другими пользователями
@@ -179,6 +180,29 @@ curl -X PATCH http://localhost:8080/api/cards/1 \
 curl -X DELETE http://localhost:8080/api/cards/1
 ```
 
+### Комментарии
+
+```bash
+# Получить комментарии к карточке
+curl http://localhost:8080/api/cards/1/comments
+
+# Добавить комментарий
+curl -X POST http://localhost:8080/api/cards/1/comments \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{"content":"Текст комментария"}'
+
+# Обновить комментарий (только автор)
+curl -X PATCH http://localhost:8080/api/comments/1 \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{"content":"Новый текст"}'
+
+# Удалить комментарий (только автор)
+curl -X DELETE http://localhost:8080/api/comments/1 \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
 ### Участники
 
 ```bash
@@ -231,12 +255,14 @@ trello-local/
 │   │   │   ├── lists.rs     # Списки
 │   │   │   ├── cards.rs     # Карточки
 │   │   │   ├── users.rs     # Пользователи
+│   │   │   ├── comments.rs  # Комментарии
 │   │   │   └── mod.rs
 │   │   ├── models/          # Модели данных
 │   │   │   ├── board.rs
 │   │   │   ├── card.rs
 │   │   │   ├── list.rs
 │   │   │   ├── user.rs
+│   │   │   ├── comment.rs   # Комментарии
 │   │   │   └── mod.rs
 │   │   ├── views/           # Представления (DTO)
 │   │   │   ├── auth_view.rs
@@ -268,7 +294,7 @@ cd backend
 cargo test
 ```
 
-Запускается 7 интеграционных тестов:
+Запускается 8 интеграционных тестов:
 - `test_create_board` — создание доски
 - `test_get_boards` — получение списка досок
 - `test_create_list` — создание списка
@@ -276,6 +302,7 @@ cargo test
 - `test_auth_register` — регистрация пользователя
 - `test_auth_login` — вход пользователя
 - `test_search_boards` — поиск досок
+- `test_comments` — комментарии к карточкам
 
 ---
 
@@ -290,10 +317,10 @@ cargo test
 
 ### Изменение секретного ключа JWT
 
-В production измените `JWT_SECRET` в файле `backend/src/handlers/auth.rs`:
+В production измените `JWT_SECRET` в файле `backend/src/views/auth_view.rs`:
 
 ```rust
-const JWT_SECRET: &[u8] = b"your-secret-key-change-in-production";
+const JWT_SECRET: &[u8] = b"trello-local-secret-key-change-in-production-2024";
 ```
 
 Или используйте переменную окружения.
