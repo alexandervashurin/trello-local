@@ -11,6 +11,7 @@
     <h1>📋 Мои доски</h1>
     <div class="user-menu">
       <span id="current-user"></span>
+      <button class="btn btn-secondary" onclick="openCalendarModal()" id="calendar-btn" style="display:none;" title="Календарь дедлайнов">📅 Календарь</button>
       <button class="btn btn-secondary" onclick="openSessionsModal()" id="sessions-btn" style="display:none;" title="Управление сессиями">🔐 Сессии</button>
       <button class="btn btn-secondary" onclick="logout()" id="logout-btn" style="display:none;">🚪 Выйти</button>
     </div>
@@ -260,6 +261,38 @@
     </div>
   </div>
 
+  <!-- Модальное окно календаря -->
+  <div id="calendar-modal" class="modal">
+    <div class="modal-content" style="max-width:800px; width:calc(100% - 40px);">
+      <div class="modal-header">
+        <h2>📅 Календарь дедлайнов</h2>
+        <button class="modal-close" onclick="closeCalendarModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="calendar-header">
+          <button class="btn btn-secondary" onclick="previousMonth()">◀ Пред.</button>
+          <h3 id="calendar-month-year" style="margin:0 16px;"></h3>
+          <button class="btn btn-secondary" onclick="nextMonth()">След. ▶</button>
+          <button class="btn btn-primary" onclick="goToToday()" style="margin-left:16px;">Сегодня</button>
+        </div>
+        <div class="calendar-stats">
+          <span>📝 Всего: <strong id="calendar-total-cards">0</strong></span>
+          <span style="margin-left:16px;">⚠️ Просрочено: <strong id="calendar-overdue-cards" style="color:var(--danger-color);">0</strong></span>
+        </div>
+        <div class="calendar-grid" id="calendar-grid">
+          <div class="loading">Загрузка календаря...</div>
+        </div>
+        <div class="calendar-day-cards" id="calendar-day-cards" style="display:none;">
+          <h4 id="calendar-selected-day-title" style="margin:16px 0 8px;"></h4>
+          <div id="calendar-selected-day-list"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeCalendarModal()">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast контейнер -->
   <div class="toast-container" id="toast-container"></div>
 
@@ -274,6 +307,7 @@
       document.getElementById('current-user').textContent = '👤 ' + user.username;
       document.getElementById('logout-btn').style.display = 'block';
       document.getElementById('sessions-btn').style.display = 'block';
+      document.getElementById('calendar-btn').style.display = 'block';
     }
 
     function logout() {
@@ -356,6 +390,13 @@
     document.getElementById('label-filter-modal').addEventListener('click', function(e) {
       if (e.target === this) {
         closeLabelFilter();
+      }
+    });
+
+    // Закрытие модального окна календаря по клику вне его
+    document.getElementById('calendar-modal').addEventListener('click', function(e) {
+      if (e.target === this) {
+        closeCalendarModal();
       }
     });
 

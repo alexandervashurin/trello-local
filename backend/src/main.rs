@@ -95,6 +95,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/boards/:id/search", get(controllers::search::search_cards_on_board))
         .route("/boards/:id/labels", get(controllers::search::get_board_labels))
         .route("/search/cards", get(controllers::search::global_card_search))
+        // Календарь
+        .route("/boards/:id/calendar", get(controllers::calendar::get_calendar))
+        .route("/boards/:id/calendar/:year/:month/:day", get(controllers::calendar::get_cards_for_day))
         // Применяем middleware для извлечения JWT claims
         .layer(from_fn_with_state(pool.clone(), middleware::auth::extract_claims))
         // Применяем rate limiter

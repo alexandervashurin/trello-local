@@ -1243,3 +1243,129 @@ body {
   border-radius: 3px;
   flex-shrink: 0;
 }
+
+/* Calendar */
+.calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #dfe1e6;
+}
+
+.calendar-stats {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.calendar-weekday {
+  text-align: center;
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 8px 0;
+}
+
+.calendar-days-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.calendar-day-empty {
+  height: 80px;
+}
+
+.calendar-day {
+  height: 80px;
+  background: #f4f5f7;
+  border-radius: 4px;
+  padding: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.calendar-day:hover {
+  background: #e4e5e7;
+  transform: scale(1.02);
+}
+
+.calendar-day-today {
+  background: #e6f7ff;
+  border: 2px solid var(--primary-color);
+}
+
+.calendar-day-has-cards {
+  background: #fff4e6;
+}
+
+.calendar-day-number {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.calendar-day-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary-color);
+  align-self: flex-start;
+}
+
+.calendar-day-overdue .calendar-day-indicator {
+  background: var(--danger-color);
+}
+
+.calendar-day-count {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: auto;
+}
+
+.calendar-day-cards {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #dfe1e6;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.calendar-card-item {
+  padding: 10px 12px;
+  background: #f4f5f7;
+  border-radius: var(--border-radius);
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.calendar-card-item:hover {
+  background: #e4e5e7;
+}
+
+.calendar-card-done {
+  opacity: 0.6;
+}
+
+.calendar-card-done strong {
+  text-decoration: line-through;
+}
+
+.calendar-card-overdue {
+  border-left: 3px solid var(--danger-color);
+}

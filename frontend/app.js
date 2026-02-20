@@ -1772,6 +1772,180 @@ function getLabelColorHex(color) {
   };
   return colors[color] || '#0079bf';
 }
+
+// === Calendar Functions ===
+let currentCalendarYear = new Date().getFullYear();
+let currentCalendarMonth = new Date().getMonth() + 1;
+let currentCalendarBoardId = null;
+
+async function openCalendarModal() {
+  const modal = document.getElementById('calendar-modal');
+  modal.classList.add('open');
+  
+  // Загружаем календарь для текущего месяца
+  currentCalendarYear = new Date().getFullYear();
+  currentCalendarMonth = new Date().getMonth() + 1;
+  
+  // Берём первую доступную доску для календаря
+  const boards = await apiRequest('/api/boards');
+  if (boards && boards.length > 0) {
+    currentCalendarBoardId = boards[0].id;
+    loadCalendar(currentCalendarBoardId, currentCalendarYear, currentCalendarMonth);
+  } else {
+    document.getElementById('calendar-grid').innerHTML = '<div class="empty-state">Нет досок для отображения календаря</div>';
+  }
+}
+
+function closeCalendarModal() {
+  const modal = document.getElementById('calendar-modal');
+  modal.classList.remove('open');
+  document.getElementById('calendar-day-cards').style.display = 'none';
+}
+
+async function loadCalendar(boardId, year, month) {
+  const grid = document.getElementById('calendar-grid');
+  const monthYearLabel = document.getElementById('calendar-month-year');
+  const totalCardsLabel = document.getElementById('calendar-total-cards');
+  const overdueCardsLabel = document.getElementById('calendar-overdue-cards');
+  
+  grid.innerHTML = '<div class="loading">Загрузка календаря...</div>';
+  
+  try {
+    const calendar = await apiRequest(`/api/boards/${boardId}/calendar?year=${year}&month=${month}`);
+    
+    const monthNames = [
+      'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+      'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
+    ];
+    
+    monthYearLabel.textContent = `${monthNames[month - 1]} ${year}`;
+    totalCardsLabel.textContent = calendar.total_cards;
+    overdueCardsLabel.textContent = calendar.overdue_cards;
+    
+    // Создаём сетку календаря
+    const daysInMonth = calendar.days.length;
+    const firstDay = new Date(year, month - 1, 1).getDay(); // 0 = воскресенье
+    const adjustedFirstDay = firstDay === 0 ? 6 : firstDay - 1; // 0 = понедельник
+    
+    let html = `
+      <div class="calendar-weekdays">
+        <div class="calendar-weekday">Пн</div>
+        <div class="calendar-weekday">Вт</div>
+        <div class="calendar-weekday">Ср</div>
+        <div class="calendar-weekday">Чт</div>
+        <div class="calendar-weekday">Пт</div>
+        <div class="calendar-weekday" style="color:#eb5a46;">Сб</div>
+        <div class="calendar-weekday" style="color:#eb5a46;">Вс</div>
+      </div>
+      <div class="calendar-days-grid">
+    `;
+    
+    // Пустые ячейки до первого дня месяца
+    for (let i = 0; i < adjustedFirstDay; i++) {
+      html += '<div class="calendar-day-empty"></div>';
+    }
+    
+    // Дни месяца
+    for (let i = 0; i < daysInMonth; i++) {
+      const day = calendar.days[i];
+      const hasCards = day.cards_count > 0;
+      const isToday = day.has_today;
+      const hasOverdue = day.overdue_count > 0;
+      
+      html += `
+        <div class="calendar-day ${isToday ? 'calendar-day-today' : ''} ${hasCards ? 'calendar-day-has-cards' : ''}" 
+             onclick="selectCalendarDay(${boardId}, '${day.date}', '${day.date}')">
+          <div class="calendar-day-number">${day.day}</div>
+          ${hasCards ? `<div class="calendar-day-indicator ${hasOverdue ? 'calendar-day-overdue' : ''}"></div>` : ''}
+          ${hasCards ? `<div class="calendar-day-count">${day.cards_count}</div>` : ''}
+        </div>
+      `;
+    }
+    
+    html += '</div>';
+    grid.innerHTML = html;
+    
+    // Скрываем панель выбранных дней
+    document.getElementById('calendar-day-cards').style.display = 'none';
+    
+  } catch (error) {
+    console.error(error);
+    grid.innerHTML = '<div class="empty-state">Ошибка загрузки календаря</div>';
+    showToast('Не удалось загрузить календарь', 'error');
+  }
+}
+
+function previousMonth() {
+  currentCalendarMonth--;
+  if (currentCalendarMonth < 1) {
+    currentCalendarMonth = 12;
+    currentCalendarYear--;
+  }
+  if (currentCalendarBoardId) {
+    loadCalendar(currentCalendarBoardId, currentCalendarYear, currentCalendarMonth);
+  }
+}
+
+function nextMonth() {
+  currentCalendarMonth++;
+  if (currentCalendarMonth > 12) {
+    currentCalendarMonth = 1;
+    currentCalendarYear++;
+  }
+  if (currentCalendarBoardId) {
+    loadCalendar(currentCalendarBoardId, currentCalendarYear, currentCalendarMonth);
+  }
+}
+
+function goToToday() {
+  currentCalendarYear = new Date().getFullYear();
+  currentCalendarMonth = new Date().getMonth() + 1;
+  if (currentCalendarBoardId) {
+    loadCalendar(currentCalendarBoardId, currentCalendarYear, currentCalendarMonth);
+  }
+}
+
+async function selectCalendarDay(boardId, date, dateLabel) {
+  const [year, month, day] = date.split('-').map(Number);
+  
+  const cardsList = document.getElementById('calendar-selected-day-list');
+  const dayTitle = document.getElementById('calendar-selected-day-title');
+  const cardsPanel = document.getElementById('calendar-day-cards');
+  
+  cardsPanel.style.display = 'block';
+  dayTitle.textContent = `📅 ${dateLabel}`;
+  cardsList.innerHTML = '<div class="loading">Загрузка...</div>';
+  
+  try {
+    const cards = await apiRequest(`/api/boards/${boardId}/calendar/${year}/${month}/${day}`);
+    
+    if (!cards || cards.length === 0) {
+      cardsList.innerHTML = '<div class="empty-state">Нет карточек на этот день</div>';
+    } else {
+      cardsList.innerHTML = cards.map(card => `
+        <div class="calendar-card-item ${card.done ? 'calendar-card-done' : ''} ${card.is_overdue ? 'calendar-card-overdue' : ''}" 
+             onclick="openCardModal(${card.id}, ${card.board_id})">
+          <div style="display:flex; justify-content:space-between; align-items:start;">
+            <div style="flex:1;">
+              <strong>${escapeHtml(card.title)}</strong>
+              <div style="font-size:11px; color:var(--text-secondary); margin-top:4px;">
+                ${escapeHtml(card.board_title)} / ${escapeHtml(card.list_title)}
+              </div>
+            </div>
+            ${card.done ? '<span style="color:var(--success-color);">✅</span>' : ''}
+            ${card.is_overdue ? '<span style="color:var(--danger-color);">⚠️</span>' : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+  } catch (error) {
+    console.error(error);
+    cardsList.innerHTML = '<div class="empty-state">Ошибка загрузки</div>';
+  }
+  
+  // Прокрутка к панели карточек
+  cardsPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
 window.deleteBoard = deleteBoard;
 window.deleteList = deleteList;
 window.deleteCard = deleteCard;
@@ -1837,6 +2011,12 @@ window.openLabelFilter = openLabelFilter;
 window.closeLabelFilter = closeLabelFilter;
 window.filterByLabel = filterByLabel;
 window.getLabelColorHex = getLabelColorHex;
+window.openCalendarModal = openCalendarModal;
+window.closeCalendarModal = closeCalendarModal;
+window.previousMonth = previousMonth;
+window.nextMonth = nextMonth;
+window.goToToday = goToToday;
+window.selectCalendarDay = selectCalendarDay;
 
 // === Init ===
 loadBoards();
