@@ -5,3 +5,4 @@ pub mod cards;
 pub mod users;
 pub mod comments;
 pub mod attachments;
+pub mod sessions;

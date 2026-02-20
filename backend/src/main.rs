@@ -24,6 +24,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let pool = db::connect().await?;
 
+    // Создаём состояние для rate limiter
+    let rate_limiter = middleware::rate_limit::RateLimiterState::with_defaults();
+    let rate_limiter_clone = rate_limiter.clone();
+
+    // Запускаем фоновую задачу для очистки старых записей
+    tokio::spawn(async move {
+        middleware::rate_limit::cleanup_old_entries(rate_limiter_clone).await;
+    });
+
     // Абсолютные пути для frontend
     let frontend_dir = "/opt/trello-local/frontend";
     let index_html = "/opt/trello-local/frontend/index.html";
@@ -35,6 +44,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Auth (без аутентификации)
         .route("/auth/register", post(controllers::auth::register))
         .route("/auth/login", post(controllers::auth::login))
+        // Сессии
+        .route("/sessions", get(controllers::sessions::get_sessions).delete(controllers::sessions::delete_all_sessions))
+        .route("/sessions/:id", delete(controllers::sessions::delete_session))
         // Пользователи
         .route("/users", get(controllers::users::get_users).post(controllers::users::create_user))
         .route("/users/:id", get(controllers::users::get_user))
@@ -68,7 +80,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/cards/:card_id/comments", get(controllers::comments::get_comments).post(controllers::comments::create_comment))
         .route("/comments/:id", patch(controllers::comments::update_comment).delete(controllers::comments::delete_comment))
         // Применяем middleware для извлечения JWT claims
-        .layer(from_fn_with_state(pool.clone(), middleware::auth::extract_claims));
+        .layer(from_fn_with_state(pool.clone(), middleware::auth::extract_claims))
+        // Применяем rate limiter
+        .layer(axum::middleware::from_fn_with_state(
+            rate_limiter,
+            middleware::rate_limit::rate_limit_middleware,
+        ));
 
     let app = Router::new()
         .nest("/api", api_routes)

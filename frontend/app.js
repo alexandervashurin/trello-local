@@ -1254,6 +1254,85 @@ function closeActivityModal() {
   currentBoardId = null;
 }
 
+// === Sessions Management ===
+async function openSessionsModal() {
+  const modal = document.getElementById('sessions-modal');
+  const sessionsList = document.getElementById('sessions-list');
+
+  modal.classList.add('open');
+  sessionsList.innerHTML = '<div class="loading">Загрузка...</div>';
+
+  try {
+    const sessions = await apiRequest('/api/sessions');
+
+    if (!sessions || sessions.length === 0) {
+      sessionsList.innerHTML = '<div class="empty-state"><p>Нет активных сессий</p></div>';
+    } else {
+      const now = Date.now() / 1000;
+      sessionsList.innerHTML = sessions.map(s => {
+        const isExpired = s.expires_at < now;
+        const isCurrent = s.last_activity > now - 60; // Активна в последнюю минуту
+        const expiresDate = new Date(s.expires_at * 1000).toLocaleString('ru-RU');
+        const lastActivity = new Date(s.last_activity * 1000).toLocaleString('ru-RU');
+        const userAgent = s.user_agent || 'Неизвестно';
+        const ip = s.ip_address || 'Неизвестно';
+
+        return `
+        <div class="session-item ${isCurrent ? 'session-current' : ''} ${isExpired ? 'session-expired' : ''}">
+          <div style="flex:1;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+              <strong>${isCurrent ? '🟢 Текущая' : isExpired ? '🔴 Истекла' : '🟡 Активна'}</strong>
+              <span style="font-size:11px; color:var(--text-secondary);">${userAgent.substring(0, 50)}${userAgent.length > 50 ? '...' : ''}</span>
+            </div>
+            <div style="font-size:11px; color:var(--text-secondary);">IP: ${ip}</div>
+            <div style="font-size:11px; color:var(--text-secondary);">Последняя активность: ${lastActivity}</div>
+            <div style="font-size:11px; color:var(--text-secondary);">Истекает: ${expiresDate}</div>
+          </div>
+          ${!isCurrent ? `<button class="btn btn-secondary" onclick="deleteSession(${s.id})" style="padding:4px 10px;font-size:11px;margin-left:8px;">Завершить</button>` : ''}
+        </div>
+      `;
+      }).join('');
+    }
+  } catch (error) {
+    console.error(error);
+    sessionsList.innerHTML = '<div class="empty-state"><p>Ошибка загрузки сессий</p></div>';
+    showToast('Не удалось загрузить сессии', 'error');
+  }
+}
+
+function closeSessionsModal() {
+  const modal = document.getElementById('sessions-modal');
+  modal.classList.remove('open');
+}
+
+async function deleteSession(sessionId) {
+  if (!confirm('Завершить эту сессию?')) return;
+
+  try {
+    await apiRequest(`/api/sessions/${sessionId}`, { method: 'DELETE' });
+    showToast('Сессия завершена', 'success');
+    openSessionsModal();
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось завершить сессию', 'error');
+  }
+}
+
+async function logoutAllSessions() {
+  if (!confirm('Завершить ВСЕ сессии? Вам придётся войти заново.')) return;
+
+  try {
+    await apiRequest('/api/sessions', { method: 'DELETE' });
+    showToast('Все сессии завершены', 'success');
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = '/login.html';
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось завершить сессии', 'error');
+  }
+}
+
 // === Export Functions for Inline Handlers ===
 window.deleteBoard = deleteBoard;
 window.deleteList = deleteList;
@@ -1297,6 +1376,10 @@ window.copyInviteLink = copyInviteLink;
 window.editLabel = editLabel;
 window.openImagePreview = openImagePreview;
 window.closeImagePreview = closeImagePreview;
+window.openSessionsModal = openSessionsModal;
+window.closeSessionsModal = closeSessionsModal;
+window.deleteSession = deleteSession;
+window.logoutAllSessions = logoutAllSessions;
 
 // === Init ===
 loadBoards();

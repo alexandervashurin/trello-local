@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Request, State},
+    extract::{Request, State, ConnectInfo},
     http::{StatusCode, header},
     middleware::Next,
     response::Response,
@@ -8,13 +8,14 @@ use sqlx::SqlitePool;
 use jsonwebtoken::{decode, Validation, Algorithm, DecodingKey};
 
 use crate::views::Claims;
+use crate::controllers::sessions;
 
 // Секретный ключ для JWT (в продакшене использовать переменную окружения!)
 const JWT_SECRET: &[u8] = b"trello-local-secret-key-change-in-production-2024";
 
 /// Извлечение Claims из запроса
 pub async fn extract_claims(
-    State(_pool): State<SqlitePool>,
+    State(pool): State<SqlitePool>,
     mut request: Request,
     next: Next,
 ) -> Result<Response, (StatusCode, String)> {
@@ -32,12 +33,49 @@ pub async fn extract_claims(
 
             let token = header.trim_start_matches("Bearer ").trim();
 
+            // Проверяем сессию в БД
+            let session_valid = sessions::is_session_valid(&pool, token).await
+                .unwrap_or(false);
+
+            if !session_valid {
+                return Err((StatusCode::UNAUTHORIZED, "Сессия истекла или не найдена".to_string()));
+            }
+
             match decode::<Claims>(
                 token,
                 &DecodingKey::from_secret(JWT_SECRET),
                 &Validation::new(Algorithm::HS256),
             ) {
-                Ok(token_data) => Some(token_data.claims),
+                Ok(token_data) => {
+                    // Обновляем активность сессии
+                    let _ = sessions::update_session_activity(&pool, token).await;
+
+                    let mut claims = token_data.claims;
+
+                    // Извлекаем User-Agent
+                    let user_agent = request
+                        .headers()
+                        .get(header::USER_AGENT)
+                        .and_then(|v| v.to_str().ok())
+                        .map(|s| s.to_string());
+
+                    // Извлекаем IP адрес
+                    let ip_address = request
+                        .headers()
+                        .get("X-Forwarded-For")
+                        .and_then(|v| v.to_str().ok())
+                        .map(|s| s.split(',').next().unwrap_or(s).trim().to_string())
+                        .or_else(|| {
+                            request.extensions()
+                                .get::<ConnectInfo<std::net::SocketAddr>>()
+                                .map(|c| c.0.ip().to_string())
+                        });
+
+                    claims.user_agent = user_agent;
+                    claims.ip_address = ip_address;
+
+                    Some(claims)
+                },
                 Err(_) => return Err((StatusCode::UNAUTHORIZED, "Неверный или истёкший токен".to_string())),
             }
         }

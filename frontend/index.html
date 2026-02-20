@@ -11,6 +11,7 @@
     <h1>📋 Мои доски</h1>
     <div class="user-menu">
       <span id="current-user"></span>
+      <button class="btn btn-secondary" onclick="openSessionsModal()" id="sessions-btn" style="display:none;" title="Управление сессиями">🔐 Сессии</button>
       <button class="btn btn-secondary" onclick="logout()" id="logout-btn" style="display:none;">🚪 Выйти</button>
     </div>
     <input type="text" id="search-input" placeholder="🔍 Поиск досок..." autocomplete="off">
@@ -193,6 +194,25 @@
     </div>
   </div>
 
+  <!-- Модальное окно сессий -->
+  <div id="sessions-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>🔐 Управление сессиями</h2>
+        <button class="modal-close" onclick="closeSessionsModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="sessions-list">
+          <div class="loading">Загрузка...</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-danger" onclick="logoutAllSessions()">🚪 Завершить все сессии</button>
+        <button class="btn btn-secondary" onclick="closeSessionsModal()">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast контейнер -->
   <div class="toast-container" id="toast-container"></div>
 
@@ -206,6 +226,7 @@
     } else {
       document.getElementById('current-user').textContent = '👤 ' + user.username;
       document.getElementById('logout-btn').style.display = 'block';
+      document.getElementById('sessions-btn').style.display = 'block';
     }
 
     function logout() {
@@ -267,6 +288,13 @@
     document.getElementById('image-preview-modal').addEventListener('click', function(e) {
       if (e.target === this) {
         closeImagePreview();
+      }
+    });
+
+    // Закрытие модального окна сессий по клику вне его
+    document.getElementById('sessions-modal').addEventListener('click', function(e) {
+      if (e.target === this) {
+        closeSessionsModal();
       }
     });
 

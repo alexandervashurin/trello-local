@@ -10,6 +10,7 @@ use jsonwebtoken::{encode, Header, EncodingKey};
 use std::time::SystemTime;
 
 use crate::views::Claims;
+use crate::controllers::sessions;
 
 // Секретный ключ для JWT (в продакшене использовать переменную окружения!)
 const JWT_SECRET: &[u8] = b"trello-local-secret-key-change-in-production-2024";
@@ -38,6 +39,9 @@ pub async fn register(
     })?;
 
     let token = generate_token(user.id, &user.username)?;
+
+    // Сохраняем сессию (без user_agent и ip для тестов)
+    let _ = sessions::save_session(&pool, user.id, &token, None, None).await;
 
     Ok(Json(AuthToken {
         token,
@@ -68,6 +72,9 @@ pub async fn login(
 
     let token = generate_token(user_with_password.id, &user_with_password.username)?;
 
+    // Сохраняем сессию (без user_agent и ip для тестов)
+    let _ = sessions::save_session(&pool, user_with_password.id, &token, None, None).await;
+
     Ok(Json(AuthToken {
         token,
         user_id: user_with_password.id,
@@ -86,6 +93,8 @@ fn generate_token(user_id: i64, username: &str) -> Result<String, (StatusCode, S
         user_id,
         username: username.to_string(),
         exp: expiration as usize,
+        user_agent: None,
+        ip_address: None,
     };
 
     encode(&Header::default(), &claims, &EncodingKey::from_secret(JWT_SECRET))

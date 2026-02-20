@@ -110,6 +110,19 @@ pub async fn connect() -> Result<SqlitePool, Box<dyn std::error::Error>> {
             FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
         );
+        CREATE TABLE IF NOT EXISTS sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            token_hash TEXT NOT NULL UNIQUE,
+            user_agent TEXT,
+            ip_address TEXT,
+            created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+            expires_at INTEGER NOT NULL,
+            last_activity INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON sessions(token_hash);
+        CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
         "#,
     )
     .execute(&pool)
