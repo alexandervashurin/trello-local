@@ -1,7 +1,9 @@
 // backend/src/main.rs
+// MVC Architecture: Model-View-Controller
 pub mod db;
 pub mod models;
-pub mod handlers;
+pub mod controllers;
+pub mod views;
 
 use axum::{
     routing::{get, post, patch, delete},
@@ -22,25 +24,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let login_html = "/opt/trello-local/frontend/login.html";
 
     let app = Router::new()
-        // Auth
-        .route("/api/auth/register", post(handlers::auth::register))
-        .route("/api/auth/login", post(handlers::auth::login))
-        // Пользователи
-        .route("/api/users", get(handlers::users::get_users).post(handlers::users::create_user))
-        .route("/api/users/:id", get(handlers::users::get_user))
-        // Доски
-        .route("/api/boards", get(handlers::boards::get_boards).post(handlers::boards::create_board))
-        .route("/api/boards/:id", patch(handlers::boards::update_board).delete(handlers::boards::delete_board))
-        .route("/api/boards/:board_id/members", get(handlers::boards::get_board_members).post(handlers::boards::add_board_member))
-        .route("/api/boards/:board_id/members/:user_id", delete(handlers::boards::remove_board_member))
-        .route("/api/users/:user_id/boards", get(handlers::boards::get_boards_for_user))
-        // Списки
-        .route("/api/boards/:board_id/lists", post(handlers::lists::create_list))
-        .route("/api/lists/:id", patch(handlers::lists::update_list).delete(handlers::lists::delete_list))
-        // Карточки
-        .route("/api/lists/:list_id/cards", post(handlers::cards::create_card))
-        .route("/api/cards/:id", patch(handlers::cards::update_card).delete(handlers::cards::delete_card))
-        // Страницы
+        // Auth (Authentication Controller)
+        .route("/api/auth/register", post(controllers::auth::register))
+        .route("/api/auth/login", post(controllers::auth::login))
+        // Пользователи (Users Controller)
+        .route("/api/users", get(controllers::users::get_users).post(controllers::users::create_user))
+        .route("/api/users/:id", get(controllers::users::get_user))
+        // Доски (Boards Controller)
+        .route("/api/boards", get(controllers::boards::get_boards).post(controllers::boards::create_board))
+        .route("/api/boards/:id", patch(controllers::boards::update_board).delete(controllers::boards::delete_board))
+        .route("/api/boards/:board_id/members", get(controllers::boards::get_board_members).post(controllers::boards::add_board_member))
+        .route("/api/boards/:board_id/members/:user_id", delete(controllers::boards::remove_board_member))
+        .route("/api/users/:user_id/boards", get(controllers::boards::get_boards_for_user))
+        // Списки (Lists Controller)
+        .route("/api/boards/:board_id/lists", post(controllers::lists::create_list))
+        .route("/api/lists/:id", patch(controllers::lists::update_list).delete(controllers::lists::delete_list))
+        // Карточки (Cards Controller)
+        .route("/api/lists/:list_id/cards", post(controllers::cards::create_card))
+        .route("/api/cards/:id", patch(controllers::cards::update_card).delete(controllers::cards::delete_card))
+        // Страницы (Static Frontend)
         .nest_service("/login.html", ServeFile::new(login_html))
         .fallback_service(
             ServeDir::new(frontend_dir)

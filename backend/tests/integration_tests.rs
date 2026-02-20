@@ -69,7 +69,7 @@ async fn test_create_board() {
     let pool = create_test_pool().await;
     init_db(&pool).await;
 
-    use backend::handlers::boards;
+    use backend::controllers::boards;
     let app = axum::Router::new()
         .route("/api/boards", axum::routing::get(boards::get_boards).post(boards::create_board))
         .with_state(pool);
@@ -95,7 +95,7 @@ async fn test_get_boards() {
     let pool = create_test_pool().await;
     init_db(&pool).await;
 
-    use backend::handlers::boards;
+    use backend::controllers::boards;
     let app = axum::Router::new()
         .route("/api/boards", axum::routing::get(boards::get_boards).post(boards::create_board))
         .with_state(pool);
@@ -134,7 +134,7 @@ async fn test_create_list() {
     let pool = create_test_pool().await;
     init_db(&pool).await;
 
-    use backend::handlers::lists;
+    use backend::controllers::lists;
     use backend::models::Board;
 
     // Сначала создаём доску
@@ -167,7 +167,7 @@ async fn test_create_card() {
     let pool = create_test_pool().await;
     init_db(&pool).await;
 
-    use backend::handlers::cards;
+    use backend::controllers::cards;
     use backend::models::{Board, List};
 
     // Создаём доску и список
@@ -206,7 +206,7 @@ async fn test_auth_register() {
     let pool = create_test_pool().await;
     init_db(&pool).await;
 
-    use backend::handlers::auth;
+    use backend::controllers::auth;
     let app = axum::Router::new()
         .route("/api/auth/register", axum::routing::post(auth::register))
         .with_state(pool);
@@ -231,7 +231,7 @@ async fn test_auth_login() {
     let pool = create_test_pool().await;
     init_db(&pool).await;
 
-    use backend::handlers::auth;
+    use backend::controllers::auth;
 
     // Создаём пользователя с паролем
     let password_hash = bcrypt::hash("password123", 12).unwrap();
@@ -266,7 +266,7 @@ async fn test_search_boards() {
     let pool = create_test_pool().await;
     init_db(&pool).await;
 
-    use backend::handlers::boards;
+    use backend::controllers::boards;
 
     // Создаём доски
     sqlx::query("INSERT INTO boards (title, owner_id, is_shared) VALUES ('Project A', 1, 0)").execute(&pool).await.unwrap();

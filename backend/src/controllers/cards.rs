@@ -1,12 +1,18 @@
-use axum::{extract::{Path, State}, http::StatusCode, Json};
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    Json,
+};
+use sqlx::SqlitePool;
 use crate::models::{Card, CreateCard, UpdateCard};
 
+/// Создать карточку в списке
 pub async fn create_card(
     Path(list_id): Path<i64>,
-    State(pool): State<sqlx::SqlitePool>,
+    State(pool): State<SqlitePool>,
     Json(payload): Json<CreateCard>,
 ) -> Result<Json<Card>, (StatusCode, String)> {
-    let card = sqlx::query_as::<_, Card>(
+    let card: Card = sqlx::query_as::<_, Card>(
         "INSERT INTO cards (list_id, title, content, done) VALUES (?, ?, ?, 0) RETURNING id, list_id, title, content, done",
     )
     .bind(list_id)
@@ -14,36 +20,36 @@ pub async fn create_card(
     .bind(&payload.content)
     .fetch_one(&pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .map_err(|e: sqlx::Error| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     Ok(Json(card))
 }
 
+/// Обновить карточку
 pub async fn update_card(
     Path(id): Path<i64>,
-    State(pool): State<sqlx::SqlitePool>,
+    State(pool): State<SqlitePool>,
     Json(payload): Json<UpdateCard>,
 ) -> Result<Json<Card>, (StatusCode, String)> {
-    // 1. Получаем текущую карточку из БД
-    let current: Card = sqlx::query_as::<_, Card>("SELECT id, list_id, title, content, done FROM cards WHERE id = ?")
-        .bind(id)
-        .fetch_one(&pool)
-        .await
-        .map_err(|e| {
-            if e.to_string().contains("no rows returned") {
-                (StatusCode::NOT_FOUND, "Карточка не найдена".to_string())
-            } else {
-                (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-            }
-        })?;
+    let current: Card = sqlx::query_as::<_, Card>(
+        "SELECT id, list_id, title, content, done FROM cards WHERE id = ?"
+    )
+    .bind(id)
+    .fetch_one(&pool)
+    .await
+    .map_err(|e: sqlx::Error| {
+        if e.to_string().contains("no rows returned") {
+            (StatusCode::NOT_FOUND, "Карточка не найдена".to_string())
+        } else {
+            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+        }
+    })?;
 
-    // 2. Формируем новые значения: используем payload, если указано, иначе — старые
     let new_title = payload.title.unwrap_or(current.title);
     let new_content = payload.content.or(current.content);
     let new_list_id = payload.list_id.unwrap_or(current.list_id);
     let new_done = payload.done.unwrap_or(current.done);
 
-    // 3. Обновляем запись в БД и возвращаем изменённую карточку
     let updated: Card = sqlx::query_as(
         "UPDATE cards SET title = ?, content = ?, list_id = ?, done = ? WHERE id = ? RETURNING id, list_id, title, content, done"
     )
@@ -59,10 +65,10 @@ pub async fn update_card(
     Ok(Json(updated))
 }
 
-
+/// Удалить карточку
 pub async fn delete_card(
     Path(id): Path<i64>,
-    State(pool): State<sqlx::SqlitePool>,
+    State(pool): State<SqlitePool>,
 ) -> Result<Json<()>, (StatusCode, String)> {
     let result = sqlx::query("DELETE FROM cards WHERE id = ?")
         .bind(id)

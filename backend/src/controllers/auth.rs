@@ -1,20 +1,27 @@
-use axum::{extract::State, http::StatusCode, Json};
-use crate::models::{RegisterUser, LoginUser, AuthToken, Claims, User};
-use jsonwebtoken::{encode, decode, Header, Validation, Algorithm, EncodingKey, DecodingKey};
+use axum::{
+    extract::State,
+    http::StatusCode,
+    Json,
+};
+use sqlx::SqlitePool;
+use crate::models::{RegisterUser, LoginUser, User};
+use crate::views::AuthToken;
+use jsonwebtoken::{encode, Header, EncodingKey};
 use std::time::SystemTime;
+
+use crate::views::Claims;
 
 // Секретный ключ для JWT (в продакшене использовать переменную окружения!)
 const JWT_SECRET: &[u8] = b"trello-local-secret-key-change-in-production-2024";
 
+/// Регистрация нового пользователя
 pub async fn register(
-    State(pool): State<sqlx::SqlitePool>,
+    State(pool): State<SqlitePool>,
     Json(payload): Json<RegisterUser>,
 ) -> Result<Json<AuthToken>, (StatusCode, String)> {
-    // Хэшируем пароль
     let password_hash = bcrypt::hash(&payload.password, 12)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    // Создаём пользователя
     let user: User = sqlx::query_as::<_, User>(
         "INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, strftime('%s', 'now')) RETURNING id, username, created_at",
     )
@@ -22,7 +29,7 @@ pub async fn register(
     .bind(&password_hash)
     .fetch_one(&pool)
     .await
-    .map_err(|e| {
+    .map_err(|e: sqlx::Error| {
         if e.to_string().contains("UNIQUE constraint failed") {
             (StatusCode::CONFLICT, "Пользователь с таким именем уже существует".to_string())
         } else {
@@ -30,7 +37,6 @@ pub async fn register(
         }
     })?;
 
-    // Генерируем JWT токен
     let token = generate_token(user.id, &user.username)?;
 
     Ok(Json(AuthToken {
@@ -40,11 +46,11 @@ pub async fn register(
     }))
 }
 
+/// Вход пользователя
 pub async fn login(
-    State(pool): State<sqlx::SqlitePool>,
+    State(pool): State<SqlitePool>,
     Json(payload): Json<LoginUser>,
 ) -> Result<Json<AuthToken>, (StatusCode, String)> {
-    // Получаем пользователя с паролем
     let user_with_password: crate::models::UserWithPassword = sqlx::query_as(
         "SELECT id, username, password_hash, created_at FROM users WHERE username = ?",
     )
@@ -53,7 +59,6 @@ pub async fn login(
     .await
     .map_err(|_| (StatusCode::UNAUTHORIZED, "Неверное имя пользователя или пароль".to_string()))?;
 
-    // Проверяем пароль
     let valid = bcrypt::verify(&payload.password, &user_with_password.password_hash)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -61,7 +66,6 @@ pub async fn login(
         return Err((StatusCode::UNAUTHORIZED, "Неверное имя пользователя или пароль".to_string()));
     }
 
-    // Генерируем JWT токен
     let token = generate_token(user_with_password.id, &user_with_password.username)?;
 
     Ok(Json(AuthToken {
@@ -71,6 +75,7 @@ pub async fn login(
     }))
 }
 
+/// Генерация JWT токена
 fn generate_token(user_id: i64, username: &str) -> Result<String, (StatusCode, String)> {
     let expiration = SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -87,10 +92,13 @@ fn generate_token(user_id: i64, username: &str) -> Result<String, (StatusCode, S
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
+/// Валидация токена
 pub async fn validate_token(
-    State(_pool): State<sqlx::SqlitePool>,
+    State(_pool): State<SqlitePool>,
     token: String,
 ) -> Result<Json<Claims>, (StatusCode, String)> {
+    use jsonwebtoken::{decode, Validation, Algorithm, DecodingKey};
+    
     decode::<Claims>(&token, &DecodingKey::from_secret(JWT_SECRET), &Validation::new(Algorithm::HS256))
         .map(|data| Json(data.claims))
         .map_err(|_| (StatusCode::UNAUTHORIZED, "Неверный токен".to_string()))
