@@ -233,8 +233,8 @@ body {
   background: var(--list-bg);
   border-radius: var(--border-radius);
   padding: 12px;
-  min-width: 280px;
-  max-width: 280px;
+  min-width: 300px;
+  width: 300px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -273,6 +273,8 @@ body {
   cursor: grab;
   transition: all 0.15s ease;
   border: 2px solid transparent;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .card:hover {
@@ -295,6 +297,7 @@ body {
   align-items: flex-start;
   gap: 8px;
   cursor: pointer;
+  width: 100%;
 }
 
 .card input[type="checkbox"] {
@@ -302,11 +305,14 @@ body {
   cursor: pointer;
   width: 16px;
   height: 16px;
+  flex-shrink: 0;
 }
 
 .card strong {
   font-weight: 600;
   color: var(--text-primary);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .card strong.done {
@@ -319,6 +325,9 @@ body {
   font-size: 13px;
   color: var(--text-secondary);
   line-height: 1.4;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: calc(100% - 24px);
 }
 
 .card-actions {
@@ -367,6 +376,7 @@ body {
   padding: 12px;
   border-radius: var(--border-radius);
   box-shadow: var(--shadow);
+  min-width: 260px;
 }
 
 .add-list-input {
@@ -376,6 +386,8 @@ body {
   font-size: 14px;
   width: 100%;
   transition: border-color 0.15s ease;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .add-list-input:focus {
@@ -386,6 +398,7 @@ body {
 .add-list-btns {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 /* Loading State */
@@ -441,6 +454,7 @@ body {
   max-height: 80vh;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
   animation: slideIn 0.2s ease;
+  width: calc(100% - 40px);
 }
 
 .modal-header {
@@ -448,11 +462,16 @@ body {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .modal-header h2 {
   margin: 0;
   font-size: 18px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  flex-shrink: 1;
 }
 
 .modal-close {
@@ -490,6 +509,8 @@ body {
   align-items: center;
   padding: 10px 12px;
   border-bottom: 1px solid #dfe1e6;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .member-item:last-child {
@@ -498,6 +519,8 @@ body {
 
 .member-item strong {
   color: var(--text-primary);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .add-member-form {
@@ -506,10 +529,12 @@ body {
   margin-top: 16px;
   padding-top: 16px;
   border-top: 1px solid #dfe1e6;
+  flex-wrap: wrap;
 }
 
 .add-member-form input {
   flex: 1;
+  min-width: 200px;
   padding: 8px 12px;
   border: 2px solid #dfe1e6;
   border-radius: var(--border-radius);
@@ -523,6 +548,8 @@ body {
   background: #fafbfc;
   border-radius: var(--border-radius);
   margin-bottom: 8px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .comment-item:last-child {
@@ -534,6 +561,8 @@ body {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .comment-header strong {
@@ -543,6 +572,7 @@ body {
 .comment-date {
   font-size: 11px;
   color: var(--text-secondary);
+  white-space: nowrap;
 }
 
 .comment-content {
@@ -550,12 +580,15 @@ body {
   color: var(--text-primary);
   line-height: 1.5;
   word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
 }
 
 .comment-actions {
   display: flex;
   gap: 4px;
   margin-top: 8px;
+  flex-wrap: wrap;
 }
 
 .add-comment-form {
@@ -703,19 +736,20 @@ body {
   }
 
   .list {
-    min-width: 260px;
-    max-width: 260px;
+    min-width: 280px;
+    width: 280px;
   }
 
   .add-list-placeholder,
   .add-card-placeholder {
-    min-width: 260px;
-    max-width: 260px;
+    min-width: 280px;
+    max-width: 280px;
   }
 
   .modal-content {
     min-width: calc(100% - 40px);
     margin: 20px;
+    width: calc(100% - 40px);
   }
 }
 
