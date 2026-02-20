@@ -119,6 +119,9 @@ async function loadBoards() {
           </div>
           <div class="board-actions">
             <span class="members-count" title="Участники">👥 ${board.members.length}</span>
+            <button class="btn btn-secondary" onclick="openBoardStats(${board.id})" title="Статистика" style="padding:4px 8px;">📊</button>
+            <button class="btn btn-secondary" onclick="exportBoardJSON(${board.id})" title="Экспорт JSON" style="padding:4px 8px;">📥 JSON</button>
+            <button class="btn btn-secondary" onclick="exportBoardCSV(${board.id})" title="Экспорт CSV" style="padding:4px 8px;">📥 CSV</button>
             <button class="btn btn-secondary" onclick="openMembersModal(${board.id})" title="Участники">👤</button>
             <button class="btn btn-secondary" onclick="openInvitationsModal(${board.id})" title="Приглашения">🔗</button>
             <button class="btn btn-secondary" onclick="deleteBoard(${board.id})" title="Удалить доску">🗑️</button>
@@ -1333,6 +1336,87 @@ async function logoutAllSessions() {
   }
 }
 
+// === Export Functions ===
+function exportBoardJSON(boardId) {
+  const link = document.createElement('a');
+  link.href = `/api/boards/${boardId}/export/json`;
+  link.download = `board_${boardId}_export.json`;
+  link.target = '_blank';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showToast('Экспорт в JSON начат', 'success');
+}
+
+function exportBoardCSV(boardId) {
+  const link = document.createElement('a');
+  link.href = `/api/boards/${boardId}/export/csv`;
+  link.download = `board_${boardId}_export.csv`;
+  link.target = '_blank';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showToast('Экспорт в CSV начат', 'success');
+}
+
+async function openBoardStats(boardId) {
+  const modal = document.getElementById('stats-modal');
+  const statsContainer = document.getElementById('stats-content');
+
+  modal.classList.add('open');
+  statsContainer.innerHTML = '<div class="loading">Загрузка статистики...</div>';
+
+  try {
+    const stats = await apiRequest(`/api/boards/${boardId}/stats`);
+
+    statsContainer.innerHTML = `
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value">${stats.total_lists}</div>
+          <div class="stat-label">📋 Списков</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">${stats.total_cards}</div>
+          <div class="stat-label">📝 Карточек всего</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">${stats.completed_cards}</div>
+          <div class="stat-label">✅ Выполнено</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">${stats.pending_cards}</div>
+          <div class="stat-label">⏳ В ожидании</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">${stats.completion_percentage.toFixed(1)}%</div>
+          <div class="stat-label">📊 Завершено</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">${stats.total_labels}</div>
+          <div class="stat-label">🏷️ Меток</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">${stats.cards_with_due_date}</div>
+          <div class="stat-label">📅 С дедлайном</div>
+        </div>
+        <div class="stat-card ${stats.overdue_cards > 0 ? 'stat-warning' : ''}">
+          <div class="stat-value">${stats.overdue_cards}</div>
+          <div class="stat-label">⚠️ Просрочено</div>
+        </div>
+      </div>
+    `;
+  } catch (error) {
+    console.error(error);
+    statsContainer.innerHTML = '<div class="empty-state"><p>Ошибка загрузки статистики</p></div>';
+    showToast('Не удалось загрузить статистику', 'error');
+  }
+}
+
+function closeBoardStats() {
+  const modal = document.getElementById('stats-modal');
+  modal.classList.remove('open');
+}
+
 // === Export Functions for Inline Handlers ===
 window.deleteBoard = deleteBoard;
 window.deleteList = deleteList;
@@ -1380,6 +1464,10 @@ window.openSessionsModal = openSessionsModal;
 window.closeSessionsModal = closeSessionsModal;
 window.deleteSession = deleteSession;
 window.logoutAllSessions = logoutAllSessions;
+window.exportBoardJSON = exportBoardJSON;
+window.exportBoardCSV = exportBoardCSV;
+window.openBoardStats = openBoardStats;
+window.closeBoardStats = closeBoardStats;
 
 // === Init ===
 loadBoards();

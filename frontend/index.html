@@ -213,6 +213,24 @@
     </div>
   </div>
 
+  <!-- Модальное окно статистики -->
+  <div id="stats-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>📊 Статистика доски</h2>
+        <button class="modal-close" onclick="closeBoardStats()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="stats-content">
+          <div class="loading">Загрузка статистики...</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeBoardStats()">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast контейнер -->
   <div class="toast-container" id="toast-container"></div>
 
@@ -295,6 +313,13 @@
     document.getElementById('sessions-modal').addEventListener('click', function(e) {
       if (e.target === this) {
         closeSessionsModal();
+      }
+    });
+
+    // Закрытие модального окна статистики по клику вне его
+    document.getElementById('stats-modal').addEventListener('click', function(e) {
+      if (e.target === this) {
+        closeBoardStats();
       }
     });
 

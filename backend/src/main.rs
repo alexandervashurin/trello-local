@@ -79,6 +79,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Комментарии
         .route("/cards/:card_id/comments", get(controllers::comments::get_comments).post(controllers::comments::create_comment))
         .route("/comments/:id", patch(controllers::comments::update_comment).delete(controllers::comments::delete_comment))
+        // Экспорт и статистика
+        .route("/boards/:id/export/json", get(controllers::export::export_board_json))
+        .route("/boards/:id/export/csv", get(controllers::export::export_board_csv))
+        .route("/boards/:id/stats", get(controllers::export::get_board_stats))
         // Применяем middleware для извлечения JWT claims
         .layer(from_fn_with_state(pool.clone(), middleware::auth::extract_claims))
         // Применяем rate limiter

@@ -6,3 +6,4 @@ pub mod users;
 pub mod comments;
 pub mod attachments;
 pub mod sessions;
+pub mod export;
