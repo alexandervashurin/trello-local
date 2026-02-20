@@ -11,6 +11,11 @@ use crate::models::{List, Card, Label, Attachment};
 use serde::Deserialize;
 use axum::extract::Extension;
 
+/// Получить базовый URL сервера из переменной окружения или использовать localhost
+fn get_server_url() -> String {
+    std::env::var("SERVER_URL").unwrap_or_else(|_| "http://localhost:8080".to_string())
+}
+
 #[derive(Deserialize)]
 pub struct GetBoardsQuery {
     search: Option<String>,
@@ -507,13 +512,14 @@ pub async fn create_invitation(
     .fetch_one(&pool)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    
+
+    let server_url = get_server_url();
     Ok(Json(InvitationView {
         token: invitation.token,
         board_id: invitation.board_id,
         role: invitation.role,
         expires_at: invitation.expires_at,
-        invite_link: format!("http://localhost:8080/invite/{}", token),
+        invite_link: format!("{}/invite/{}", server_url, token),
     }))
 }
 
@@ -588,6 +594,7 @@ pub async fn get_board_invitations(
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
+    let server_url = get_server_url();
     let views: Vec<InvitationView> = invitations.into_iter().map(|i| {
         let token = i.token;
         InvitationView {
@@ -595,7 +602,7 @@ pub async fn get_board_invitations(
             board_id: i.board_id,
             role: i.role,
             expires_at: i.expires_at,
-            invite_link: format!("http://localhost:8080/invite/{}", token),
+            invite_link: format!("{}/invite/{}", server_url, token),
         }
     }).collect();
 
