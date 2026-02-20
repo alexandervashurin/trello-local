@@ -19,6 +19,28 @@ async fn get_board_id_by_list_id(pool: &SqlitePool, list_id: i64) -> Option<i64>
     result.map(|r| r.0)
 }
 
+/// Получить одну карточку
+pub async fn get_card(
+    Path(id): Path<i64>,
+    State(pool): State<SqlitePool>,
+) -> Result<Json<Card>, (StatusCode, String)> {
+    let card: Card = sqlx::query_as::<_, Card>(
+        "SELECT id, list_id, title, content, done, due_date FROM cards WHERE id = ?"
+    )
+    .bind(id)
+    .fetch_one(&pool)
+    .await
+    .map_err(|e: sqlx::Error| {
+        if e.to_string().contains("no rows returned") {
+            (StatusCode::NOT_FOUND, "Карточка не найдена".to_string())
+        } else {
+            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+        }
+    })?;
+
+    Ok(Json(card))
+}
+
 /// Создать карточку в списке
 pub async fn create_card(
     Path(list_id): Path<i64>,

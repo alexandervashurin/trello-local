@@ -327,18 +327,19 @@ function cancelAddList(boardId) {
 function showAddCardForm(listId) {
   const placeholder = document.querySelector(`.add-card-placeholder[data-list-id="${listId}"]`);
   if (!placeholder) return;
-  
+
   placeholder.innerHTML = `
     <div class="add-card-form">
       <input type="text" class="add-list-input" placeholder="Название карточки" maxlength="100" autofocus>
       <textarea class="add-list-input" placeholder="Описание (необязательно)" rows="2" style="margin-top:5px;resize:vertical;"></textarea>
+      <input type="datetime-local" class="add-list-input" placeholder="Дедлайн (необязательно)" style="margin-top:5px;">
       <div class="add-list-btns">
         <button class="btn btn-primary" onclick="createCard(${listId}, this)">Добавить</button>
         <button class="btn btn-secondary" onclick="cancelAddCard(${listId})">Отмена</button>
       </div>
     </div>
   `;
-  
+
   // Focus on title input
   const input = placeholder.querySelector('input');
   if (input) {
@@ -358,20 +359,22 @@ async function createCard(listId, button) {
   const form = button.closest('.add-card-form');
   const titleInput = form.querySelector('input');
   const contentInput = form.querySelector('textarea');
+  const dueDateInput = form.querySelector('input[type="datetime-local"]');
   const title = titleInput.value.trim();
   const content = contentInput.value.trim() || null;
-  
+  const due_date = dueDateInput && dueDateInput.value ? Math.floor(new Date(dueDateInput.value).getTime() / 1000) : null;
+
   if (!title) {
     titleInput.focus();
     return;
   }
-  
+
   try {
     await apiRequest(`/api/lists/${listId}/cards`, {
       method: 'POST',
-      body: JSON.stringify({ title, content })
+      body: JSON.stringify({ title, content, due_date })
     });
-    
+
     showToast('Карточка создана', 'success');
     loadBoards();
   } catch (error) {

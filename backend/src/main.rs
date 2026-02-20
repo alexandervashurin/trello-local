@@ -64,8 +64,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/boards/:board_id/lists", post(controllers::lists::create_list))
         .route("/lists/:id", patch(controllers::lists::update_list).delete(controllers::lists::delete_list))
         // Карточки
+        .route("/cards/:id", get(controllers::cards::get_card).patch(controllers::cards::update_card).delete(controllers::cards::delete_card))
         .route("/lists/:list_id/cards", post(controllers::cards::create_card))
-        .route("/cards/:id", patch(controllers::cards::update_card).delete(controllers::cards::delete_card))
         // Метки
         .route("/cards/:card_id/labels", get(controllers::cards::get_card_labels).post(controllers::cards::create_label))
         .route("/cards/:card_id/labels/:label_id", patch(controllers::cards::update_label).delete(controllers::cards::delete_label))
