@@ -2020,6 +2020,152 @@ window.previousMonth = previousMonth;
 window.nextMonth = nextMonth;
 window.goToToday = goToToday;
 window.selectCalendarDay = selectCalendarDay;
+window.openProfileModal = openProfileModal;
+window.closeProfileModal = closeProfileModal;
+window.saveProfile = saveProfile;
+window.openChangePassword = openChangePassword;
+window.openDeleteAccount = openDeleteAccount;
+
+// === Profile Management ===
+async function openProfileModal() {
+  const modal = document.getElementById('profile-modal');
+  const content = document.getElementById('profile-content');
+
+  modal.classList.add('open');
+  content.innerHTML = '<div class="loading">Загрузка профиля...</div>';
+
+  try {
+    const user = await apiRequest('/api/profile');
+
+    content.innerHTML = `
+      <div class="profile-form">
+        <div class="profile-avatar" style="width:80px; height:80px; border-radius:50%; background:${user.avatar_color || '#0079bf'}; display:flex; align-items:center; justify-content:center; font-size:32px; font-weight:bold; color:white; margin:0 auto 16px;">
+          ${user.username.charAt(0).toUpperCase()}
+        </div>
+
+        <div class="profile-info">
+          <div class="profile-field">
+            <label>👤 Имя пользователя</label>
+            <input type="text" id="profile-username" value="${escapeHtml(user.username)}" disabled style="background:#f4f5f7;">
+          </div>
+
+          <div class="profile-field">
+            <label>📧 Email</label>
+            <input type="email" id="profile-email" value="${escapeHtml(user.email || '')}" placeholder="Не указан">
+          </div>
+
+          <div class="profile-field">
+            <label>🎨 Цвет аватара</label>
+            <input type="color" id="profile-avatar-color" value="${user.avatar_color || '#0079bf'}" style="width:100%; height:40px; cursor:pointer;">
+          </div>
+
+          <div class="profile-field">
+            <label>📝 О себе</label>
+            <textarea id="profile-bio" rows="3" placeholder="Расскажите о себе...">${escapeHtml(user.bio || '')}</textarea>
+          </div>
+
+          <div class="profile-field">
+            <label>📅 Зарегистрирован</label>
+            <input type="text" value="${new Date(user.created_at * 1000).toLocaleDateString('ru-RU')}" disabled style="background:#f4f5f7;">
+          </div>
+
+          <div class="profile-field">
+            <label>🕐 Последний вход</label>
+            <input type="text" value="${user.last_login ? new Date(user.last_login * 1000).toLocaleString('ru-RU') : '—'}" disabled style="background:#f4f5f7;">
+          </div>
+        </div>
+
+        <div class="profile-actions" style="display:flex; gap:10px; margin-top:20px; flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="saveProfile()" style="flex:1;">💾 Сохранить</button>
+          <button class="btn btn-secondary" onclick="openChangePassword()" style="flex:1;">🔑 Сменить пароль</button>
+          <button class="btn btn-danger" onclick="openDeleteAccount()" style="flex:1;">🗑️ Удалить аккаунт</button>
+        </div>
+      </div>
+    `;
+  } catch (error) {
+    console.error(error);
+    content.innerHTML = '<div class="empty-state">Ошибка загрузки профиля</div>';
+    showToast('Не удалось загрузить профиль', 'error');
+  }
+}
+
+function closeProfileModal() {
+  const modal = document.getElementById('profile-modal');
+  modal.classList.remove('open');
+}
+
+async function saveProfile() {
+  const email = document.getElementById('profile-email').value.trim();
+  const avatarColor = document.getElementById('profile-avatar-color').value;
+  const bio = document.getElementById('profile-bio').value.trim();
+
+  try {
+    const user = await apiRequest('/api/profile', {
+      method: 'PATCH',
+      body: JSON.stringify({ email, avatar_color: avatarColor, bio: bio || null })
+    });
+
+    // Обновляем аватар в UI
+    const avatarEl = document.querySelector('.profile-avatar');
+    if (avatarEl) {
+      avatarEl.style.backgroundColor = avatarColor;
+    }
+
+    showToast('Профиль обновлён', 'success');
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'Не удалось сохранить профиль', 'error');
+  }
+}
+
+async function openChangePassword() {
+  const currentPassword = prompt('Введите текущий пароль:');
+  if (!currentPassword) return;
+
+  const newPassword = prompt('Введите новый пароль (минимум 6 символов):');
+  if (!newPassword) return;
+
+  if (newPassword.length < 6) {
+    showToast('Пароль должен быть не менее 6 символов', 'error');
+    return;
+  }
+
+  try {
+    await apiRequest('/api/profile/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword })
+    });
+
+    showToast('Пароль успешно изменён', 'success');
+    closeProfileModal();
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'Не удалось сменить пароль', 'error');
+  }
+}
+
+async function openDeleteAccount() {
+  const password = prompt('⚠️ ВНИМАНИЕ! Это действие необратимо.\n\nВведите ваш пароль для подтверждения удаления аккаунта:');
+  if (!password) return;
+
+  if (!confirm('Вы уверены, что хотите удалить аккаунт? Все ваши доски, карточки и данные будут безвозвратно удалены.')) {
+    return;
+  }
+
+  try {
+    await apiRequest('/api/profile/delete', {
+      method: 'POST',
+      body: JSON.stringify({ password })
+    });
+
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = '/login.html';
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'Не удалось удалить аккаунт', 'error');
+  }
+}
 
 // === Init ===
 loadBoards();

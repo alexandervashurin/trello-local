@@ -5,6 +5,10 @@ use sqlx::FromRow;
 pub struct User {
     pub id: i64,
     pub username: String,
+    pub email: Option<String>,
+    pub avatar_color: Option<String>,
+    pub bio: Option<String>,
+    pub last_login: Option<i64>,
     pub created_at: i64,
 }
 
@@ -13,12 +17,29 @@ pub struct UserWithPassword {
     pub id: i64,
     pub username: String,
     pub password_hash: String,
+    pub email: Option<String>,
+    pub avatar_color: Option<String>,
+    pub bio: Option<String>,
+    pub last_login: Option<i64>,
     pub created_at: i64,
 }
 
 #[derive(Deserialize)]
 pub struct CreateUser {
     pub username: String,
+}
+
+#[derive(Deserialize)]
+pub struct UpdateProfile {
+    pub email: Option<String>,
+    pub avatar_color: Option<String>,
+    pub bio: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct ChangePassword {
+    pub current_password: String,
+    pub new_password: String,
 }
 
 #[derive(Deserialize)]

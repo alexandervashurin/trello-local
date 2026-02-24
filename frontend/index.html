@@ -10,7 +10,7 @@
   <div class="header">
     <h1>📋 Мои доски</h1>
     <div class="user-menu">
-      <span id="current-user"></span>
+      <span id="current-user" style="cursor:pointer;" onclick="openProfileModal()" title="Открыть профиль"></span>
       <button class="btn btn-secondary" onclick="openCalendarModal()" id="calendar-btn" style="display:none;" title="Календарь дедлайнов">📅 Календарь</button>
       <button class="btn btn-secondary" onclick="openSessionsModal()" id="sessions-btn" style="display:none;" title="Управление сессиями">🔐 Сессии</button>
       <button class="btn btn-secondary" onclick="logout()" id="logout-btn" style="display:none;">🚪 Выйти</button>
@@ -289,6 +289,24 @@
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeCalendarModal()">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно профиля пользователя -->
+  <div id="profile-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>👤 Профиль пользователя</h2>
+        <button class="modal-close" onclick="closeProfileModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="profile-content">
+          <div class="loading">Загрузка профиля...</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeProfileModal()">Закрыть</button>
       </div>
     </div>
   </div>

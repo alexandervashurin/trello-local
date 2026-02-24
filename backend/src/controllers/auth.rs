@@ -41,7 +41,7 @@ pub async fn register(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let user: User = sqlx::query_as::<_, User>(
-        "INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, strftime('%s', 'now')) RETURNING id, username, created_at",
+        "INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, strftime('%s', 'now')) RETURNING id, username, email, avatar_color, bio, last_login, created_at",
     )
     .bind(&payload.username)
     .bind(&password_hash)
@@ -73,7 +73,7 @@ pub async fn login(
     Json(payload): Json<LoginUser>,
 ) -> Result<Json<AuthToken>, (StatusCode, String)> {
     let user_with_password: crate::models::UserWithPassword = sqlx::query_as(
-        "SELECT id, username, password_hash, created_at FROM users WHERE username = ?",
+        "SELECT id, username, password_hash, email, avatar_color, bio, last_login, created_at FROM users WHERE username = ?",
     )
     .bind(&payload.username)
     .fetch_one(&pool)
@@ -86,6 +86,12 @@ pub async fn login(
     if !valid {
         return Err((StatusCode::UNAUTHORIZED, "Неверное имя пользователя или пароль".to_string()));
     }
+
+    // Обновляем last_login
+    let _ = sqlx::query("UPDATE users SET last_login = strftime('%s', 'now') WHERE id = ?")
+        .bind(user_with_password.id)
+        .execute(&pool)
+        .await;
 
     let token = generate_token(user_with_password.id, &user_with_password.username)?;
 

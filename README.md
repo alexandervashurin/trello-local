@@ -236,6 +236,32 @@ curl -X POST http://localhost:8080/api/users \
 curl http://localhost:8080/api/users/1/boards
 ```
 
+### Профиль пользователя
+
+```bash
+# Получить свой профиль
+curl http://localhost:8080/api/profile \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+
+# Обновить профиль (email, avatar_color, bio)
+curl -X PATCH http://localhost:8080/api/profile \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{"email":"alice@example.com","avatar_color":"#0079bf","bio":"Разработчик"}'
+
+# Сменить пароль
+curl -X POST http://localhost:8080/api/profile/change-password \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{"current_password":"oldpass123","new_password":"newpass456"}'
+
+# Удалить аккаунт (требуется подтверждение паролем)
+curl -X POST http://localhost:8080/api/profile/delete \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{"password":"your_password"}'
+```
+
 ---
 
 ## 📂 Структура проекта

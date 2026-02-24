@@ -175,6 +175,24 @@ pub async fn connect() -> Result<SqlitePool, Box<dyn std::error::Error>> {
         .await
         .ok();
 
+    // Добавляем новые поля для управления профилями пользователей
+    sqlx::query("ALTER TABLE users ADD COLUMN email TEXT")
+        .execute(&pool)
+        .await
+        .ok();
+    sqlx::query("ALTER TABLE users ADD COLUMN avatar_color TEXT DEFAULT '#0079bf'")
+        .execute(&pool)
+        .await
+        .ok();
+    sqlx::query("ALTER TABLE users ADD COLUMN bio TEXT")
+        .execute(&pool)
+        .await
+        .ok();
+    sqlx::query("ALTER TABLE users ADD COLUMN last_login INTEGER")
+        .execute(&pool)
+        .await
+        .ok();
+
     // Создаём пользователя по умолчанию
     sqlx::query(
         "INSERT OR IGNORE INTO users (id, username, created_at) VALUES (1, 'default', strftime('%s', 'now'))",

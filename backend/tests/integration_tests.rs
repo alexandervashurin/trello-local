@@ -18,6 +18,10 @@ async fn init_db(pool: &SqlitePool) {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL UNIQUE,
             password_hash TEXT,
+            email TEXT,
+            avatar_color TEXT DEFAULT '#0079bf',
+            bio TEXT,
+            last_login INTEGER,
             created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
         );
         CREATE TABLE IF NOT EXISTS boards (

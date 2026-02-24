@@ -50,6 +50,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Пользователи
         .route("/users", get(controllers::users::get_users).post(controllers::users::create_user))
         .route("/users/:id", get(controllers::users::get_user))
+        .route("/profile", get(controllers::users::get_profile).patch(controllers::users::update_profile))
+        .route("/profile/change-password", post(controllers::users::change_password))
+        .route("/profile/delete", post(controllers::users::delete_account))
         // Доски
         .route("/boards", get(controllers::boards::get_boards).post(controllers::boards::create_board))
         .route("/boards/:id", patch(controllers::boards::update_board).delete(controllers::boards::delete_board))
