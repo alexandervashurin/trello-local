@@ -2,8 +2,8 @@ use sqlx::SqlitePool;
 use std::path::PathBuf;
 
 pub async fn connect() -> Result<SqlitePool, Box<dyn std::error::Error>> {
-    // Жёстко заданный путь для установки в /opt/trello-local
-    let db_path = PathBuf::from("/opt/trello-local/backend/data/trello.db");
+    // Путь к базе данных (относительный для разработки)
+    let db_path = PathBuf::from("data/trello.db");
 
     // Создаём директорию, если не существует
     if let Some(parent) = db_path.parent() {
