@@ -27,6 +27,16 @@ impl Default for RateLimiterConfig {
     }
 }
 
+/// Конфигурация для авторизации (более строгая)
+impl RateLimiterConfig {
+    pub fn for_auth() -> Self {
+        Self {
+            max_requests: 5, // 5 попыток
+            window_duration: Duration::from_secs(60), // в минуту
+        }
+    }
+}
+
 /// Запись о запросах клиента
 #[derive(Clone, Debug)]
 struct ClientRequests {
@@ -51,6 +61,10 @@ impl RateLimiterState {
 
     pub fn with_defaults() -> Self {
         Self::new(RateLimiterConfig::default())
+    }
+
+    pub fn for_auth() -> Self {
+        Self::new(RateLimiterConfig::for_auth())
     }
 }
 
@@ -96,7 +110,11 @@ pub async fn rate_limit_middleware(
     if entry.count > state.config.max_requests {
         return Err((
             StatusCode::TOO_MANY_REQUESTS,
-            "Слишком много запросов. Попробуйте позже.".to_string(),
+            format!(
+                "Слишком много запросов. Лимит: {} запросов в {:?}. Попробуйте позже.",
+                state.config.max_requests,
+                state.config.window_duration.as_secs()
+            ),
         ));
     }
 

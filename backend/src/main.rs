@@ -24,9 +24,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let pool = db::connect().await?;
 
-    // Создаём состояние для rate limiter
+    // Создаём состояние для rate limiter (общий)
     let rate_limiter = middleware::rate_limit::RateLimiterState::with_defaults();
     let rate_limiter_clone = rate_limiter.clone();
+
+    // Создаём состояние для rate limiter авторизации (строгий)
+    let auth_rate_limiter = middleware::rate_limit::RateLimiterState::for_auth();
 
     // Запускаем фоновую задачу для очистки старых записей
     tokio::spawn(async move {
@@ -39,11 +42,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let login_html = "/opt/trello-local/frontend/login.html";
     let invite_html = "/opt/trello-local/frontend/invite.html";
 
+    // Auth роуты с отдельным rate limiter (без аутентификации)
+    let auth_routes = Router::new()
+        .route("/register", post(controllers::auth::register))
+        .route("/login", post(controllers::auth::login))
+        .layer(axum::middleware::from_fn_with_state(
+            auth_rate_limiter,
+            middleware::rate_limit::rate_limit_middleware,
+        ));
+
     // API роуты с middleware
     let api_routes = Router::new()
-        // Auth (без аутентификации)
-        .route("/auth/register", post(controllers::auth::register))
-        .route("/auth/login", post(controllers::auth::login))
+        // Auth (с rate limiting)
+        .nest("/auth", auth_routes)
         // Сессии
         .route("/sessions", get(controllers::sessions::get_sessions).delete(controllers::sessions::delete_all_sessions))
         .route("/sessions/:id", delete(controllers::sessions::delete_session))
@@ -136,9 +147,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("\n👋 Остановка сервера...");
         })
         .await
-        .unwrap_or_else(|e| {
-            eprintln!("❌ Ошибка сервера: {}", e);
-        });
+        .expect("Сервер завершил работу с ошибкой");
 
     Ok(())
 }
