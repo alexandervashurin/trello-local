@@ -13,9 +13,21 @@ use crate::views::Claims;
 use crate::controllers::sessions;
 
 /// Получение JWT secret из переменной окружения
+/// В production среде JWT_SECRET должен быть установлен обязательно
 fn get_jwt_secret() -> Vec<u8> {
     std::env::var("JWT_SECRET")
-        .unwrap_or_else(|_| "trello-local-secret-key-change-in-production-2024".to_string())
+        .inspect_err(|_| {
+            tracing::warn!("JWT_SECRET не установлен! Используйте уникальное значение в production");
+        })
+        .unwrap_or_else(|_| {
+            // Генерируем случайный секрет только для разработки
+            use std::time::{SystemTime, UNIX_EPOCH};
+            let seed = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("Время не может идти вспять")
+                .as_nanos();
+            format!("dev-secret-{}", seed)
+        })
         .into_bytes()
 }
 
@@ -33,8 +45,18 @@ pub async fn register(
     }
 
     // Валидация пароля
-    if payload.password.len() < 6 {
-        return Err((StatusCode::BAD_REQUEST, "Пароль должен быть не менее 6 символов".to_string()));
+    if payload.password.len() < 8 {
+        return Err((StatusCode::BAD_REQUEST, "Пароль должен быть не менее 8 символов".to_string()));
+    }
+    
+    // Проверка сложности пароля
+    let has_upper = payload.password.chars().any(|c| c.is_uppercase());
+    let has_lower = payload.password.chars().any(|c| c.is_lowercase());
+    let has_digit = payload.password.chars().any(|c| c.is_numeric());
+    
+    if !has_upper || !has_lower || !has_digit {
+        return Err((StatusCode::BAD_REQUEST, 
+            "Пароль должен содержать заглавные и строчные буквы, а также цифры".to_string()));
     }
 
     let password_hash = bcrypt::hash(&payload.password, 12)
@@ -109,7 +131,7 @@ pub async fn login(
 fn generate_token(user_id: i64, username: &str) -> Result<String, (StatusCode, String)> {
     let expiration = SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
+        .expect("Время не может идти вспять")
         .as_secs() + 60 * 60 * 24 * 7; // 7 дней
 
     let claims = Claims {

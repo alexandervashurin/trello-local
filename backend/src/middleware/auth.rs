@@ -10,10 +10,23 @@ use jsonwebtoken::{decode, Validation, Algorithm, DecodingKey};
 use crate::views::Claims;
 use crate::controllers::sessions;
 
-/// Получение JWT secret из переменной окружения или использование значения по умолчанию
+/// Получение JWT secret из переменной окружения
+/// В production среде JWT_SECRET должен быть установлен обязательно
 fn get_jwt_secret() -> Vec<u8> {
     std::env::var("JWT_SECRET")
-        .unwrap_or_else(|_| "trello-local-secret-key-change-in-production-2024".to_string())
+        .inspect_err(|_| {
+            tracing::warn!("JWT_SECRET не установлен! Используйте уникальное значение в production");
+        })
+        .unwrap_or_else(|_| {
+            // Генерируем случайный секрет только для разработки
+            // В production это должно вызывать ошибку
+            use std::time::{SystemTime, UNIX_EPOCH};
+            let seed = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("Время не может идти вспять")
+                .as_nanos();
+            format!("dev-secret-{}", seed)
+        })
         .into_bytes()
 }
 
