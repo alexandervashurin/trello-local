@@ -2128,11 +2128,21 @@ async function openChangePassword() {
   const currentPassword = prompt('Введите текущий пароль:');
   if (!currentPassword) return;
 
-  const newPassword = prompt('Введите новый пароль (минимум 6 символов):');
+  const newPassword = prompt('Введите новый пароль (минимум 8 символов, заглавные, строчные, цифры):');
   if (!newPassword) return;
 
-  if (newPassword.length < 6) {
-    showToast('Пароль должен быть не менее 6 символов', 'error');
+  if (newPassword.length < 8) {
+    showToast('Пароль должен быть не менее 8 символов', 'error');
+    return;
+  }
+  
+  // Проверка сложности пароля
+  const hasUpper = /[A-Z]/.test(newPassword);
+  const hasLower = /[a-z]/.test(newPassword);
+  const hasDigit = /\d/.test(newPassword);
+  
+  if (!hasUpper || !hasLower || !hasDigit) {
+    showToast('Пароль должен содержать заглавные и строчные буквы, а также цифры', 'error');
     return;
   }
 

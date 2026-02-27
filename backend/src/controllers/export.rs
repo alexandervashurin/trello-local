@@ -59,10 +59,12 @@ pub async fn export_board_json(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let mut headers = HeaderMap::new();
-    headers.insert("Content-Type", "application/json".parse().unwrap());
+    headers.insert("Content-Type", "application/json".parse()
+        .expect("Content-Type должен быть валидным заголовком"));
     headers.insert(
         "Content-Disposition",
-        format!("attachment; filename=\"board_{}_export.json\"", board_id).parse().unwrap(),
+        format!("attachment; filename=\"board_{}_export.json\"", board_id).parse()
+            .expect("Content-Disposition должен быть валидным заголовком"),
     );
 
     Ok(Response::builder()
@@ -112,10 +114,12 @@ pub async fn export_board_csv(
     }
 
     let mut headers = HeaderMap::new();
-    headers.insert("Content-Type", "text/csv".parse().unwrap());
+    headers.insert("Content-Type", "text/csv".parse()
+        .expect("Content-Type должен быть валидным заголовком"));
     headers.insert(
         "Content-Disposition",
-        format!("attachment; filename=\"board_{}_export.csv\"", board_id).parse().unwrap(),
+        format!("attachment; filename=\"board_{}_export.csv\"", board_id).parse()
+            .expect("Content-Disposition должен быть валидным заголовком"),
     );
 
     Ok(Response::builder()

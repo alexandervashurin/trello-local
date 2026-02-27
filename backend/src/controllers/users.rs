@@ -158,8 +158,18 @@ pub async fn change_password(
     }
 
     // Валидация нового пароля
-    if payload.new_password.len() < 6 {
-        return Err((StatusCode::BAD_REQUEST, "Новый пароль должен быть не менее 6 символов".to_string()));
+    if payload.new_password.len() < 8 {
+        return Err((StatusCode::BAD_REQUEST, "Новый пароль должен быть не менее 8 символов".to_string()));
+    }
+    
+    // Проверка сложности нового пароля
+    let has_upper = payload.new_password.chars().any(|c| c.is_uppercase());
+    let has_lower = payload.new_password.chars().any(|c| c.is_lowercase());
+    let has_digit = payload.new_password.chars().any(|c| c.is_numeric());
+    
+    if !has_upper || !has_lower || !has_digit {
+        return Err((StatusCode::BAD_REQUEST, 
+            "Новый пароль должен содержать заглавные и строчные буквы, а также цифры".to_string()));
     }
 
     // Хэшируем и сохраняем новый пароль
