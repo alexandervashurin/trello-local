@@ -279,22 +279,27 @@
     document.getElementById('register-password').addEventListener('input', function() {
       const password = this.value;
       const strengthEl = document.getElementById('password-strength');
-      
+
       if (!password) {
         strengthEl.textContent = '';
         strengthEl.className = 'password-strength';
         return;
       }
-      
+
       let strength = 0;
-      if (password.length >= 6) strength++;
-      if (password.length >= 10) strength++;
-      if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
-      if (/\d/.test(password)) strength++;
-      if (/[^a-zA-Z0-9]/.test(password)) strength++;
+      const hasLower = /[a-z]/.test(password);
+      const hasUpper = /[A-Z]/.test(password);
+      const hasDigit = /\d/.test(password);
+      const hasSpecial = /[^a-zA-Z0-9]/.test(password);
       
+      if (password.length >= 8) strength++;
+      if (password.length >= 12) strength++;
+      if (hasLower && hasUpper) strength++;
+      if (hasDigit) strength++;
+      if (hasSpecial) strength++;
+
       if (strength <= 2) {
-        strengthEl.textContent = 'Слабый пароль';
+        strengthEl.textContent = 'Слабый пароль (мин. 8 символов, заглавные, строчные, цифры)';
         strengthEl.className = 'password-strength weak';
       } else if (strength <= 3) {
         strengthEl.textContent = 'Средний пароль';
@@ -379,8 +384,18 @@
         return;
       }
 
-      if (password.length < 6) {
-        showToast('Пароль должен быть не менее 6 символов', 'error');
+      if (password.length < 8) {
+        showToast('Пароль должен быть не менее 8 символов', 'error');
+        return;
+      }
+      
+      // Проверка сложности пароля
+      const hasUpper = /[A-Z]/.test(password);
+      const hasLower = /[a-z]/.test(password);
+      const hasDigit = /\d/.test(password);
+      
+      if (!hasUpper || !hasLower || !hasDigit) {
+        showToast('Пароль должен содержать заглавные и строчные буквы, а также цифры', 'error');
         return;
       }
 
