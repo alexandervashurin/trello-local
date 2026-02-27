@@ -19,6 +19,9 @@ use tower_http::trace::TraceLayer;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Загрузка переменных окружения из .env
+    dotenv::dotenv().ok();
+
     // Инициализация tracing
     tracing_subscriber::fmt::init();
 

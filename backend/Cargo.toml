@@ -20,6 +20,7 @@ chrono = "0.4"
 uuid = { version = "1", features = ["v4"] }
 axum-macros = "0.4"
 sha2 = "0.10"
+dotenv = "0.15"
 
 [[bin]]
 name = "reset_password"
