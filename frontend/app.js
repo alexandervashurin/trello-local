@@ -32,12 +32,18 @@ if (searchInput) {
 function showToast(message, type = 'info', duration = 3000) {
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
+
+  const icon = document.createElement('span');
+  icon.textContent = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
   
-  const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
-  toast.innerHTML = `<span>${icon}</span><span>${message}</span>`;
+  const text = document.createElement('span');
+  text.textContent = message;
   
+  toast.appendChild(icon);
+  toast.appendChild(text);
+
   toastContainer.appendChild(toast);
-  
+
   setTimeout(() => {
     toast.style.animation = 'slideInRight 0.3s ease reverse';
     setTimeout(() => toast.remove(), 300);
