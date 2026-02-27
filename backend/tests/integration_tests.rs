@@ -232,7 +232,7 @@ async fn test_auth_register() {
                 .method("POST")
                 .uri("/api/auth/register")
                 .header("Content-Type", "application/json")
-                .body(Body::from(json!({ "username": "newuser", "password": "password123" }).to_string()))
+                .body(Body::from(json!({ "username": "newuser", "password": "Password123" }).to_string()))
                 .unwrap(),
         )
         .await
