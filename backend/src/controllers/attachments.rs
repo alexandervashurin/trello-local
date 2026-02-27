@@ -8,6 +8,26 @@ use crate::models::Attachment;
 use std::path::PathBuf;
 use chrono::Utc;
 
+/// Максимальный размер загружаемого файла (10 MB)
+const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024;
+
+/// Разрешённые MIME-типы для загружаемых файлов
+const ALLOWED_MIME_TYPES: &[&str] = &[
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    "application/pdf",
+    "text/plain",
+    "application/json",
+    "application/zip",
+    "application/x-zip-compressed",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+];
+
 /// Загрузить файл к карточке
 pub async fn upload_attachment(
     Path((card_id, _board_id)): Path<(i64, i64)>,
@@ -32,10 +52,25 @@ pub async fn upload_attachment(
         .file_name()
         .unwrap_or("unnamed")
         .to_string();
-    
+
+    // Валидация имени файла
+    if filename.is_empty() || filename.contains("..") || filename.contains('/') || filename.contains('\\') {
+        return Err((StatusCode::BAD_REQUEST, "Недопустимое имя файла".to_string()));
+    }
+
     // Получаем mime_type до вызова bytes()
     let mime_type = field.content_type().map(|s| s.to_string());
-    
+
+    // Валидация MIME-типа
+    if let Some(ref mt) = mime_type {
+        if !ALLOWED_MIME_TYPES.contains(&mt.as_str()) {
+            return Err((StatusCode::BAD_REQUEST, format!(
+                "Недопустимый тип файла. Разрешены: {}",
+                ALLOWED_MIME_TYPES.join(", ")
+            )));
+        }
+    }
+
     // Генерируем уникальное имя файла
     let timestamp = Utc::now().timestamp();
     let safe_filename = format!("{}_{}", timestamp, filename.replace(" ", "_"));
@@ -46,7 +81,18 @@ pub async fn upload_attachment(
         .await
         .map_err(|e| (StatusCode::BAD_REQUEST, format!("Ошибка чтения файла: {}", e)))?;
 
-    let file_size = data.len() as i64;
+    // Валидация размера файла
+    let file_size = data.len() as u64;
+    if file_size > MAX_FILE_SIZE {
+        return Err((StatusCode::BAD_REQUEST, format!(
+            "Файл слишком большой. Максимальный размер: {} MB",
+            MAX_FILE_SIZE / 1024 / 1024
+        )));
+    }
+
+    if file_size == 0 {
+        return Err((StatusCode::BAD_REQUEST, "Пустой файл".to_string()));
+    }
 
     // Сохраняем файл
     std::fs::write(&file_path, &data)
@@ -60,7 +106,7 @@ pub async fn upload_attachment(
     .bind(user_id)
     .bind(&filename)
     .bind(file_path.to_string_lossy().to_string())
-    .bind(file_size)
+    .bind(file_size as i64)
     .bind(mime_type)
     .fetch_one(&pool)
     .await
