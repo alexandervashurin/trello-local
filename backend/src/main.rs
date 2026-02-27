@@ -39,11 +39,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         middleware::rate_limit::cleanup_old_entries(rate_limiter_clone).await;
     });
 
-    // Абсолютные пути для frontend
-    let frontend_dir = "/opt/trello-local/frontend";
-    let index_html = "/opt/trello-local/frontend/index.html";
-    let login_html = "/opt/trello-local/frontend/login.html";
-    let invite_html = "/opt/trello-local/frontend/invite.html";
+    // Абсолютные пути для frontend (или относительные для разработки)
+    let frontend_dir = std::env::var("FRONTEND_DIR")
+        .unwrap_or_else(|_| "/opt/trello-local/frontend".to_string());
+    let index_html = format!("{}/index.html", frontend_dir);
+    let login_html = format!("{}/login.html", frontend_dir);
+    let invite_html = format!("{}/invite.html", frontend_dir);
 
     // Auth роуты с отдельным rate limiter (без аутентификации)
     let auth_routes = Router::new()
