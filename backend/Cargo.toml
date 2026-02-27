@@ -20,6 +20,10 @@ uuid = { version = "1", features = ["v4"] }
 axum-macros = "0.4"
 sha2 = "0.10"
 
+[[bin]]
+name = "reset_password"
+path = "scripts/reset_password.rs"
+
 [dev-dependencies]
 axum = { version = "0.7", features = ["macros"] }
 tokio = { version = "1", features = ["full", "test-util"] }
