@@ -21,6 +21,17 @@
     </div>
     <input type="text" id="search-input" placeholder="🔍 Поиск досок..." autocomplete="off">
     <button class="create-board-btn" id="create-board-btn">➕ Новая доска</button>
+    <button class="btn btn-secondary" onclick="toggleBulkMode()" id="bulk-mode-btn" title="Массовые операции" style="margin-left:8px;">✓ Выделение</button>
+  </div>
+
+  <!-- Панель массовых операций -->
+  <div id="bulk-actions-panel" style="display:none;position:sticky;top:0;z-index:100;background:var(--board-bg);padding:12px 20px;margin-bottom:20px;border-radius:var(--border-radius);box-shadow:var(--shadow);align-items:center;gap:12px;flex-wrap:wrap;">
+    <span style="font-weight:600;">📋 Выбрано: <span id="selected-count">0</span></span>
+    <button class="btn btn-primary" onclick="bulkMoveCards()" title="Переместить в другой список">📦 Переместить</button>
+    <button class="btn btn-success" onclick="bulkMarkDone()" title="Отметить выполненными">✅ Выполнено</button>
+    <button class="btn btn-secondary" onclick="bulkMarkTodo()" title="Вернуть в работу">↩️ В работу</button>
+    <button class="btn btn-danger" onclick="bulkDeleteCards()" title="Удалить выбранные">🗑️ Удалить</button>
+    <button class="btn btn-secondary" onclick="clearCardSelection()" style="margin-left:auto;">✕ Снять выделение</button>
   </div>
 
   <div id="boards-container">

@@ -72,6 +72,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/templates/:id", get(controllers::templates::get_template).delete(controllers::templates::delete_template))
         .route("/templates/:id/apply", post(controllers::templates::apply_template))
         .route("/boards/:board_id/template", post(controllers::templates::create_template_from_board))
+        // Массовые операции
+        .route("/cards/bulk/move", post(controllers::bulk_operations::bulk_move_cards))
+        .route("/cards/bulk/update", post(controllers::bulk_operations::bulk_update_cards))
+        .route("/cards/bulk/delete", post(controllers::bulk_operations::bulk_delete_cards))
         // Пользователи
         .route("/users", get(controllers::users::get_users).post(controllers::users::create_user))
         .route("/users/:id", get(controllers::users::get_user))

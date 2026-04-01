@@ -9,6 +9,51 @@ let currentCardId = null;
 let currentCardData = null;
 let isLoading = false;
 
+// === Массовые операции ===
+let selectedCards = new Set();
+let isBulkMode = false;
+
+function toggleBulkMode() {
+  isBulkMode = !isBulkMode;
+  if (!isBulkMode) {
+    selectedCards.clear();
+  }
+  updateBulkModeUI();
+}
+
+function toggleCardSelection(cardId) {
+  if (selectedCards.has(cardId)) {
+    selectedCards.delete(cardId);
+  } else {
+    selectedCards.add(cardId);
+  }
+  updateBulkModeUI();
+}
+
+function clearCardSelection() {
+  selectedCards.clear();
+  updateBulkModeUI();
+}
+
+function updateBulkModeUI() {
+  // Показываем/скрываем чекбоксы
+  document.querySelectorAll('.card-checkbox').forEach(cb => {
+    cb.style.display = isBulkMode ? 'inline-block' : 'none';
+  });
+  
+  // Показываем панель массовых операций
+  const bulkPanel = document.getElementById('bulk-actions-panel');
+  if (bulkPanel) {
+    bulkPanel.style.display = selectedCards.size > 0 ? 'flex' : 'none';
+  }
+  
+  // Обновляем счётчик выбранных
+  const countEl = document.getElementById('selected-count');
+  if (countEl) {
+    countEl.textContent = selectedCards.size;
+  }
+}
+
 // === Тема (Тёмная/Светлая) ===
 // Загрузка сохранённой темы при старте
 (function initTheme() {
@@ -171,15 +216,17 @@ async function loadBoards() {
               </div>
               <div class="cards" data-list-id="${list.id}">
                 ${list.cards.map(card => `
-                  <div class="card"
+                  <div class="card ${selectedCards.has(card.id) ? 'card-selected' : ''}"
                        draggable="true"
                        data-card-id="${card.id}"
                        data-list-id="${list.id}"
                        ondblclick="openCardModal(${card.id}, ${board.id})">
                     <div style="display:flex; justify-content:space-between; align-items:start;">
-                      <label style="display:flex; align-items:flex-start; gap:8px; cursor:pointer; flex:1;">
-                        <input type="checkbox" ${card.done ? 'checked' : ''} onchange="toggleCardDone(${card.id}, this.checked)" style="margin-top:3px;">
-                        <span style="width:100%;">
+                      <div style="display:flex; gap:8px; align-items:flex-start;">
+                        <input type="checkbox" class="card-checkbox" ${selectedCards.has(card.id) ? 'checked' : ''} onchange="toggleCardSelection(${card.id}); event.stopPropagation();" style="margin-top:3px;display:none;" title="Выделить для массовых операций">
+                        <label style="display:flex; align-items:flex-start; gap:8px; cursor:pointer;">
+                          <input type="checkbox" ${card.done ? 'checked' : ''} onchange="toggleCardDone(${card.id}, this.checked)" style="margin-top:3px;">
+                          <span style="width:100%;">
                           <div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:4px;">
                             ${(card.labels || []).map(l => `<span class="label-badge label-${l.color}" title="${escapeHtml(l.name)}">${escapeHtml(l.name)}</span>`).join('')}
                           </div>
@@ -191,6 +238,7 @@ async function loadBoards() {
                           ${(card.attachments || []).length > 0 ? `<div style="margin-top:4px;font-size:11px;color:var(--text-secondary);">📎 ${card.attachments.length} влож.</div>` : ''}
                         </span>
                       </label>
+                      </div>
                       <div class="card-actions">
                         <button class="btn btn-secondary" onclick="openCardModal(${card.id}, ${board.id})" title="Открыть карточку" style="padding:2px 6px;font-size:10px;">✏️</button>
                         <button class="btn btn-secondary" onclick="openCommentsModal(${card.id})" title="Комментарии" style="padding:2px 6px;font-size:10px;">💬</button>
@@ -2341,6 +2389,130 @@ async function markAllNotificationsRead() {
 function navigateTo(link) {
   if (link) {
     window.location.href = link;
+  }
+}
+
+// === Массовые операции ===
+
+async function bulkMoveCards() {
+  if (selectedCards.size === 0) {
+    showToast('Выберите карточки для перемещения', 'warning');
+    return;
+  }
+  
+  const listId = prompt('Введите ID списка для перемещения:');
+  if (!listId) return;
+  
+  try {
+    const response = await apiRequest('/api/cards/bulk/move', {
+      method: 'POST',
+      body: JSON.stringify({
+        card_ids: Array.from(selectedCards),
+        list_id: parseInt(listId)
+      })
+    });
+    
+    if (response.success) {
+      showToast(`Перемещено ${response.processed_count} карточек`, 'success');
+      clearCardSelection();
+      toggleBulkMode();
+      loadBoards();
+    } else {
+      showToast(`Перемещено: ${response.processed_count}, ошибок: ${response.failed_count}`, 'warning');
+    }
+  } catch (error) {
+    console.error(error);
+    showToast('Ошибка массового перемещения', 'error');
+  }
+}
+
+async function bulkMarkDone() {
+  if (selectedCards.size === 0) {
+    showToast('Выберите карточки для отметки', 'warning');
+    return;
+  }
+  
+  try {
+    const response = await apiRequest('/api/cards/bulk/update', {
+      method: 'POST',
+      body: JSON.stringify({
+        card_ids: Array.from(selectedCards),
+        done: true
+      })
+    });
+    
+    if (response.success) {
+      showToast(`Отмечено ${response.processed_count} карточек`, 'success');
+      clearCardSelection();
+      toggleBulkMode();
+      loadBoards();
+    } else {
+      showToast(`Обновлено: ${response.processed_count}, ошибок: ${response.failed_count}`, 'warning');
+    }
+  } catch (error) {
+    console.error(error);
+    showToast('Ошибка массового обновления', 'error');
+  }
+}
+
+async function bulkMarkTodo() {
+  if (selectedCards.size === 0) {
+    showToast('Выберите карточки для возврата', 'warning');
+    return;
+  }
+  
+  try {
+    const response = await apiRequest('/api/cards/bulk/update', {
+      method: 'POST',
+      body: JSON.stringify({
+        card_ids: Array.from(selectedCards),
+        done: false
+      })
+    });
+    
+    if (response.success) {
+      showToast(`Возвращено в работу ${response.processed_count} карточек`, 'success');
+      clearCardSelection();
+      toggleBulkMode();
+      loadBoards();
+    } else {
+      showToast(`Обновлено: ${response.processed_count}, ошибок: ${response.failed_count}`, 'warning');
+    }
+  } catch (error) {
+    console.error(error);
+    showToast('Ошибка массового обновления', 'error');
+  }
+}
+
+async function bulkDeleteCards() {
+  if (selectedCards.size === 0) {
+    showToast('Выберите карточки для удаления', 'warning');
+    return;
+  }
+  
+  if (!confirm(`Удалить ${selectedCards.size} карточек? Это действие необратимо.`)) {
+    return;
+  }
+  
+  try {
+    const response = await apiRequest('/api/cards/bulk/delete', {
+      method: 'POST',
+      body: JSON.stringify({
+        card_ids: Array.from(selectedCards)
+      })
+    });
+    
+    if (response.success) {
+      showToast(`Удалено ${response.processed_count} карточек`, 'success');
+      clearCardSelection();
+      toggleBulkMode();
+      loadBoards();
+    } else {
+      showToast(`Удалено: ${response.processed_count}, ошибок: ${response.failed_count}`, 'warning');
+    }
+  } catch (error) {
+    console.error(error);
+    showToast('Ошибка массового удаления', 'error');
   }
 }
 

@@ -13,3 +13,4 @@ pub mod calendar;
 pub mod card_history;
 pub mod notifications;
 pub mod templates;
+pub mod bulk_operations;
