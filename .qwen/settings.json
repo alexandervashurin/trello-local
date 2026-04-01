@@ -16,7 +16,9 @@
       "Bash(ss *)",
       "Bash(cargo doc *)",
       "Bash(grep *)",
-      "Bash(sed *)"
+      "Bash(sed *)",
+      "Bash(mkdir *)",
+      "Bash(mv *)"
     ]
   },
   "$version": 3
