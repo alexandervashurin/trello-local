@@ -1,0 +1,42 @@
+/* frontend/css/variables.css */
+/* CSS Переменные и темизация */
+
+:root {
+  --primary-color: #0079bf;
+  --primary-hover: #0064a0;
+  --secondary-color: #5e6c84;
+  --danger-color: #eb5a46;
+  --success-color: #61bd4f;
+  --bg-color: #f0f2f5;
+  --board-bg: #e2e4e6;
+  --list-bg: #ebecf0;
+  --card-bg: #ffffff;
+  --text-primary: #172b4d;
+  --text-secondary: #6b778c;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  --shadow-hover: 0 2px 8px rgba(0, 0, 0, 0.15);
+  --border-radius: 6px;
+  --modal-bg: #ffffff;
+  --input-bg: #ffffff;
+  --border-color: #dfe1e6;
+}
+
+/* Тёмная тема */
+[data-theme="dark"] {
+  --primary-color: #0079bf;
+  --primary-hover: #0064a0;
+  --secondary-color: #8c9bb0;
+  --danger-color: #cf514c;
+  --success-color: #57a852;
+  --bg-color: #1a1d21;
+  --board-bg: #25282d;
+  --list-bg: #2d313a;
+  --card-bg: #343842;
+  --text-primary: #e4e6eb;
+  --text-secondary: #b0b3b8;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-hover: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --modal-bg: #2d313a;
+  --input-bg: #343842;
+  --border-color: #4e5259;
+}

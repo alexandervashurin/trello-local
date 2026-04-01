@@ -1,0 +1,70 @@
+/* frontend/css/checklists.css */
+/* Чек-листы и исполнители */
+
+/* Checklists */
+.checklists-container,
+.assignees-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.checklist-item-container {
+  background: #f4f5f7;
+  padding: 12px;
+  border-radius: var(--border-radius);
+  margin-bottom: 8px;
+}
+
+.checklist-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.checklist-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: white;
+  border-radius: 4px;
+  transition: background 0.15s ease;
+}
+
+.checklist-item:hover {
+  background: #e4e5e7;
+}
+
+.checklist-item-done {
+  opacity: 0.7;
+}
+
+.checklist-item input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* Assignees */
+.assignees-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.assignee-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: #f4f5f7;
+  border-radius: var(--border-radius);
+}

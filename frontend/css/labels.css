@@ -1,0 +1,104 @@
+/* frontend/css/labels.css */
+/* Метки и фильтр по меткам */
+
+/* Labels */
+.label-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: white;
+  text-transform: uppercase;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.label-blue { background: #0079bf; }
+.label-green { background: #61bd4f; }
+.label-yellow { background: #f2d600; color: #333; }
+.label-red { background: #eb5a46; }
+.label-purple { background: #c377e0; }
+.label-orange { background: #ff9f1a; }
+
+.label-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: var(--border-radius);
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: white;
+}
+
+.label-item label-blue { background: #0079bf; }
+.label-item label-green { background: #61bd4f; }
+.label-item label-yellow { background: #f2d600; color: #333; }
+.label-item label-red { background: #eb5a46; }
+.label-item label-purple { background: #c377e0; }
+.label-item label-orange { background: #ff9f1a; }
+
+.labels-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.add-label-form {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.add-label-form input {
+  flex: 1;
+  min-width: 120px;
+  padding: 6px 10px;
+  border: 2px solid #dfe1e6;
+  border-radius: var(--border-radius);
+  font-size: 13px;
+  background: white;
+}
+
+.add-label-form select {
+  padding: 6px 10px;
+  border: 2px solid #dfe1e6;
+  border-radius: var(--border-radius);
+  font-size: 13px;
+  background: white;
+}
+
+/* Label Filter */
+.label-filter-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label-filter-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #f4f5f7;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.label-filter-item:hover {
+  background: #e4e5e7;
+}
+
+.label-color-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}

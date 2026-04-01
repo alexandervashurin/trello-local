@@ -1,0 +1,179 @@
+/* frontend/css/modals.css */
+/* Модальные окна */
+
+.modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  animation: fadeIn 0.2s ease;
+}
+
+.modal.open {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-content {
+  background: white;
+  padding: 24px;
+  border-radius: var(--border-radius);
+  min-width: 360px;
+  max-width: 500px;
+  max-height: 80vh;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  animation: slideIn 0.2s ease;
+  width: calc(100% - 40px);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .modal-content {
+  background: var(--modal-bg);
+  color: var(--text-primary);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 18px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  flex-shrink: 1;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 0;
+  line-height: 1;
+}
+
+.modal-close:hover {
+  color: var(--text-primary);
+}
+
+.modal-body {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+/* Card Modal */
+.card-modal-content {
+  max-width: 600px;
+  width: calc(100% - 40px);
+}
+
+.card-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.card-edit-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.card-edit-label span {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.card-edit-label input,
+.card-edit-label textarea {
+  padding: 8px 12px;
+  border: 2px solid #dfe1e6;
+  border-radius: var(--border-radius);
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.card-edit-label input:focus,
+.card-edit-label textarea:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.card-section {
+  border-top: 1px solid #dfe1e6;
+  padding-top: 16px;
+}
+
+.card-section h4 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Image Preview Modal */
+#image-preview-modal .modal-content {
+  background: rgba(0, 0, 0, 0.9);
+  max-width: 90%;
+  min-width: auto;
+  padding: 12px;
+  box-shadow: none;
+}
+
+#image-preview-modal .modal-header h2 {
+  color: white;
+}
+
+#image-preview-modal .modal-close {
+  color: white;
+}
+
+#image-preview-modal .modal-body {
+  max-height: none;
+  text-align: center;
+}
+
+#image-preview-img {
+  max-width: 100%;
+  max-height: 80vh;
+  border-radius: 4px;
+}
+
+/* Анимации */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translate(-50%, -60%);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, -50%);
+    opacity: 1;
+  }
+}
