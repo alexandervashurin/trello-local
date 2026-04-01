@@ -8,6 +8,7 @@
 
 ## ✨ Особенности
 
+### 📋 Управление задачами
 - ✅ **Полностью автономно**: работает без интернета
 - ✅ **Простота установки**: один бинарный файл + база данных
 - ✅ **Drag-and-drop**: перетаскивайте карточки между списками
@@ -15,11 +16,32 @@
 - ✅ **Комментарии**: обсуждайте задачи в карточках
 - ✅ **Многоуровневая структура**: доски → списки → карточки
 - 🌐 **Доступ из любой точки локальной сети**
+
+### 👥 Совместная работа
 - 👥 **Общие доски**: делитесь досками с другими пользователями
 - 🔐 **Управление участниками**: назначайте роли и контролируйте доступ
+- 🔔 **Уведомления**: polling для уведомлений о изменениях
+- 📜 **История изменений**: версионирование карточек
+- 📋 **Шаблоны досок**: сохранение и применение шаблонов
+- ✓ **Массовые операции**: выделение и обработка нескольких карточек
+
+### 🔒 Безопасность
 - 🔑 **Регистрация/авторизация**: JWT-токены, хэширование паролей (bcrypt)
+- 🔒 **HTTPS поддержка**: через reverse proxy (nginx/Caddy)
+- 🛡️ **Content Security Policy**: защита от XSS
+- 📊 **Логирование событий**: аудит входов и изменений
+- 🔄 **Rate Limiting**: защита от brute-force
+
+### 🎨 Интерфейс
+- 🌙 **Тёмная тема**: переключатель тем
 - 🔍 **Поиск**: быстрый поиск по доскам
+- 📅 **Календарь**: дедлайны на месяц
+- 📊 **Статистика**: прогресс выполнения задач
+- 📥 **Экспорт**: JSON и CSV
+
+### 🐳 Развёртывание
 - 🐳 **Docker**: готовая контейнеризация
+- ⚙️ **Переменные окружения**: гибкая настройка
 
 ---
 
@@ -68,6 +90,40 @@ docker run -d -p 8080:8080 -v trello-data:/app/backend/data --name trello-local 
 ```bash
 docker run --rm -v trello-data:/data -v $(pwd):/backup ubuntu tar czf /backup/trello-backup.tar.gz -C /data .
 ```
+
+---
+
+## 🔒 HTTPS (Production)
+
+Для работы через HTTPS используйте reverse proxy (nginx или Caddy).
+
+### nginx пример
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name trello.yourdomain.com;
+
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+
+    location / {
+        proxy_pass http://localhost:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+### Caddy пример
+
+```
+trello.yourdomain.com {
+    reverse_proxy localhost:8080
+}
+```
+
+**📄 Подробная инструкция:** [HTTPS_SETUP.md](HTTPS_SETUP.md)
 
 ---
 
@@ -338,18 +394,32 @@ cargo test
 
 | Переменная | Описание | По умолчанию |
 |------------|----------|--------------|
+| `PORT` | Порт для прослушивания | `8080` |
 | `DATABASE_PATH` | Путь к базе данных | `/app/backend/data/trello.db` |
 | `RUST_LOG` | Уровень логирования | `info` |
+| `JWT_SECRET` | Секретный ключ JWT | (генерируется) |
+| `FRONTEND_DIR` | Путь к frontend | `/opt/trello-local/frontend` |
+
+### Пример .env файла
+
+```bash
+PORT=8080
+DATABASE_PATH=/var/lib/trello-local/trello.db
+JWT_SECRET=your-secret-key-here
+RUST_LOG=info
+FRONTEND_DIR=/opt/trello-local/frontend
+```
 
 ### Изменение секретного ключа JWT
 
-В production измените `JWT_SECRET` в файле `backend/src/views/auth_view.rs`:
+В production обязательно установите уникальный `JWT_SECRET`:
 
-```rust
-const JWT_SECRET: &[u8] = b"trello-local-secret-key-change-in-production-2024";
+```bash
+# Генерация безопасного секрета
+export JWT_SECRET="$(openssl rand -hex 32)"
 ```
 
-Или используйте переменную окружения.
+Или добавьте в `.env` файл.
 
 ---
 
@@ -407,6 +477,15 @@ server {
     }
 }
 ```
+
+---
+
+## 📚 Документация
+
+- **[HTTPS_SETUP.md](HTTPS_SETUP.md)** — настройка HTTPS (nginx/Caddy)
+- **[SECURITY_AUDIT_2026.md](SECURITY_AUDIT_2026.md)** — аудит безопасности
+- **[SECURITY_FIXES.md](SECURITY_FIXES.md)** — исправления уязвимостей
+- **[DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md)** — план разработки
 
 ---
 
