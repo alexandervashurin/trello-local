@@ -40,6 +40,23 @@ pub async fn connect() -> Result<SqlitePool, Box<dyn std::error::Error>> {
             FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         );
+        CREATE TABLE IF NOT EXISTS board_permissions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            board_id INTEGER NOT NULL,
+            role TEXT NOT NULL DEFAULT 'member',
+            can_view BOOLEAN NOT NULL DEFAULT 1,
+            can_create_cards BOOLEAN NOT NULL DEFAULT 1,
+            can_edit_cards BOOLEAN NOT NULL DEFAULT 0,
+            can_delete_cards BOOLEAN NOT NULL DEFAULT 0,
+            can_move_cards BOOLEAN NOT NULL DEFAULT 0,
+            can_create_lists BOOLEAN NOT NULL DEFAULT 0,
+            can_edit_lists BOOLEAN NOT NULL DEFAULT 0,
+            can_delete_lists BOOLEAN NOT NULL DEFAULT 0,
+            can_manage_members BOOLEAN NOT NULL DEFAULT 0,
+            can_manage_settings BOOLEAN NOT NULL DEFAULT 0,
+            FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE,
+            UNIQUE(board_id, role)
+        );
         CREATE TABLE IF NOT EXISTS board_invitations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             board_id INTEGER NOT NULL,
@@ -275,6 +292,35 @@ pub async fn connect() -> Result<SqlitePool, Box<dyn std::error::Error>> {
     // Добавляем пользователя как владельца доски
     sqlx::query(
         "INSERT OR IGNORE INTO board_members (board_id, user_id, role) VALUES (1, 1, 'owner')",
+    )
+    .execute(&pool)
+    .await?;
+
+    // Инициализируем права по умолчанию для ролей
+    sqlx::query(
+        "INSERT OR IGNORE INTO board_permissions (board_id, role, can_view, can_create_cards, can_edit_cards, can_delete_cards, can_move_cards, can_create_lists, can_edit_lists, can_delete_lists, can_manage_members, can_manage_settings)
+         VALUES (1, 'owner', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)",
+    )
+    .execute(&pool)
+    .await?;
+    
+    sqlx::query(
+        "INSERT OR IGNORE INTO board_permissions (board_id, role, can_view, can_create_cards, can_edit_cards, can_delete_cards, can_move_cards, can_create_lists, can_edit_lists, can_delete_lists, can_manage_members, can_manage_settings)
+         VALUES (1, 'admin', 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)",
+    )
+    .execute(&pool)
+    .await?;
+    
+    sqlx::query(
+        "INSERT OR IGNORE INTO board_permissions (board_id, role, can_view, can_create_cards, can_edit_cards, can_delete_cards, can_move_cards, can_create_lists, can_edit_lists, can_delete_lists, can_manage_members, can_manage_settings)
+         VALUES (1, 'member', 1, 1, 0, 0, 0, 0, 0, 0, 0, 0)",
+    )
+    .execute(&pool)
+    .await?;
+    
+    sqlx::query(
+        "INSERT OR IGNORE INTO board_permissions (board_id, role, can_view, can_create_cards, can_edit_cards, can_delete_cards, can_move_cards, can_create_lists, can_edit_lists, can_delete_lists, can_manage_members, can_manage_settings)
+         VALUES (1, 'viewer', 1, 0, 0, 0, 0, 0, 0, 0, 0, 0)",
     )
     .execute(&pool)
     .await?;

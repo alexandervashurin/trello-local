@@ -18,7 +18,8 @@
       "Bash(grep *)",
       "Bash(sed *)",
       "Bash(mkdir *)",
-      "Bash(mv *)"
+      "Bash(mv *)",
+      "Bash(find *)"
     ]
   },
   "$version": 3

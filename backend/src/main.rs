@@ -101,6 +101,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/boards/:board_id/invitations/:token", delete(controllers::boards::delete_invitation))
         .route("/invite/:token", post(controllers::boards::accept_invitation))
         .route("/users/:user_id/boards", get(controllers::boards::get_boards_for_user))
+        // Права доступа
+        .route("/boards/:board_id/permissions", get(controllers::permissions::get_board_permissions))
+        .route("/boards/:board_id/permissions/:role", patch(controllers::permissions::update_role_permissions))
+        .route("/boards/:board_id/permissions/:role/:permission", get(controllers::permissions::check_permission))
         // Списки
         .route("/boards/:board_id/lists", post(controllers::lists::create_list))
         .route("/lists/:id", patch(controllers::lists::update_list).delete(controllers::lists::delete_list))

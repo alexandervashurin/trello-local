@@ -31,6 +31,7 @@ import { openLabelsModal, closeLabelsModal, selectLabelColor, addLabel, deleteLa
 import { createChecklist, deleteChecklist, addChecklistItem, toggleChecklistItem, deleteChecklistItem, renderChecklists } from './modules/checklists.js';
 import { openActivityModal, closeActivityModal, loadActivityLog, renderActivityLog } from './modules/activity.js';
 import { openAttachmentsModal, closeAttachmentsModal, closeImagePreview, openImagePreview, uploadAttachment, deleteAttachment, renderAttachments } from './modules/attachments.js';
+import { openPermissionsModal, closePermissionsModal, updatePermission, loadBoardPermissions, checkPermission, renderPermissionsSettings } from './modules/permissions.js';
 
 // Экспорт в глобальную область для HTML onclick handlers
 window.toggleTheme = toggleTheme;
@@ -182,6 +183,13 @@ window.closeImagePreview = closeImagePreview;
 window.openImagePreview = openImagePreview;
 window.uploadAttachment = uploadAttachment;
 window.deleteAttachment = deleteAttachment;
+
+window.openPermissionsModal = openPermissionsModal;
+window.closePermissionsModal = closePermissionsModal;
+window.updatePermission = updatePermission;
+window.loadBoardPermissions = loadBoardPermissions;
+window.checkPermission = checkPermission;
+window.renderPermissionsSettings = renderPermissionsSettings;
 
 window.bulkMarkDone = bulkMarkDone;
 window.bulkMarkTodo = bulkMarkTodo;

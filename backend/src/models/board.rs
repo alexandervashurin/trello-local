@@ -66,3 +66,36 @@ pub struct BoardInvitation {
     pub expires_at: Option<i64>,
     pub used: bool,
 }
+
+/// Гранулярные права доступа
+#[derive(Serialize, FromRow, Clone, Debug)]
+pub struct BoardPermission {
+    pub id: i64,
+    pub board_id: i64,
+    pub role: String,
+    pub can_view: bool,
+    pub can_create_cards: bool,
+    pub can_edit_cards: bool,
+    pub can_delete_cards: bool,
+    pub can_move_cards: bool,
+    pub can_create_lists: bool,
+    pub can_edit_lists: bool,
+    pub can_delete_lists: bool,
+    pub can_manage_members: bool,
+    pub can_manage_settings: bool,
+}
+
+/// Запрос на обновление прав роли
+#[derive(Deserialize)]
+pub struct UpdateRolePermissions {
+    pub can_view: Option<bool>,
+    pub can_create_cards: Option<bool>,
+    pub can_edit_cards: Option<bool>,
+    pub can_delete_cards: Option<bool>,
+    pub can_move_cards: Option<bool>,
+    pub can_create_lists: Option<bool>,
+    pub can_edit_lists: Option<bool>,
+    pub can_delete_lists: Option<bool>,
+    pub can_manage_members: Option<bool>,
+    pub can_manage_settings: Option<bool>,
+}
