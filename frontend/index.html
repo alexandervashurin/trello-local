@@ -20,6 +20,7 @@
   <link rel="stylesheet" href="css/calendar.css">
   <link rel="stylesheet" href="css/profile.css">
   <link rel="stylesheet" href="css/responsive.css">
+  <link rel="stylesheet" href="css/backup.css">
 </head>
 <body>
   <div class="header">
@@ -32,6 +33,7 @@
       <span id="current-user" style="cursor:pointer;" onclick="openProfileModal()" title="Открыть профиль"></span>
       <button class="btn btn-secondary" onclick="openCalendarModal()" id="calendar-btn" style="display:none;" title="Календарь дедлайнов">📅 Календарь</button>
       <button class="btn btn-secondary" onclick="openSessionsModal()" id="sessions-btn" style="display:none;" title="Управление сессиями">🔐 Сессии</button>
+      <button class="btn btn-secondary" onclick="openBackupModal()" id="backup-btn" style="display:none;" title="Резервное копирование">💾 Backup</button>
       <button class="btn btn-secondary" onclick="logout()" id="logout-btn" style="display:none;">🚪 Выйти</button>
     </div>
     <input type="text" id="search-input" placeholder="🔍 Поиск досок..." autocomplete="off">
@@ -471,6 +473,24 @@
       <div class="modal-footer">
         <button class="btn btn-primary" onclick="markAllNotificationsRead()">Отметить все как прочитанные</button>
         <button class="btn btn-secondary" onclick="closeNotificationsModal()">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно backup -->
+  <div id="backup-modal" class="modal">
+    <div class="modal-content" style="max-width:800px;min-width:600px;">
+      <div class="modal-header">
+        <h2>💾 Резервное копирование</h2>
+        <button class="modal-close" onclick="closeBackupModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="backup-content">
+          <div class="loading">Загрузка...</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeBackupModal()">Закрыть</button>
       </div>
     </div>
   </div>

@@ -300,6 +300,23 @@ pub async fn connect() -> Result<SqlitePool, Box<dyn std::error::Error>> {
         .await
         .ok();
 
+    // Таблица для backup'ов
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS backups (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            filename TEXT NOT NULL,
+            file_path TEXT NOT NULL,
+            file_size INTEGER NOT NULL,
+            created_by INTEGER NOT NULL,
+            created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+            description TEXT,
+            FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+        )",
+    )
+    .execute(&pool)
+    .await
+    .ok();
+
     // Создаём пользователя по умолчанию
     sqlx::query(
         "INSERT OR IGNORE INTO users (id, username, created_at) VALUES (1, 'default', strftime('%s', 'now'))",

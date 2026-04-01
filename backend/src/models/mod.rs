@@ -6,6 +6,7 @@ pub mod comment;
 pub mod notification;
 pub mod template;
 pub mod oauth;
+pub mod backup;
 
 pub use user::{User, UserWithPassword, CreateUser, RegisterUser, LoginUser, Session, SessionInfo, UpdateProfile, ChangePassword, TwoFASetup, TwoFACode, TwoFAEnable, TwoFAStatus, TwoFATempToken};
 pub use board::{Board, CreateBoard, UpdateBoard, AddBoardMember, BoardMember, BoardInvitation, CreateInvitation, BoardPermission, UpdateRolePermissions};
@@ -15,3 +16,4 @@ pub use comment::{Comment, CommentWithUser, CreateComment, UpdateComment};
 pub use notification::{Notification, NotificationWithCreator, CreateNotification, UpdateNotificationRead};
 pub use template::{BoardTemplate, TemplateList, TemplateCard, CreateBoardTemplate, TemplateApplyResult};
 pub use oauth::{OAuthAccount, OAuthCallback, OAuthUrl, OAuthUserInfo};
+pub use backup::{Backup, CreateBackup, RestoreBackup, BackupList};

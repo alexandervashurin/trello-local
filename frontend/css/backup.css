@@ -1,0 +1,141 @@
+/* frontend/css/backup.css */
+/* Backup Management */
+
+.backup-container {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.backup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.backup-header h2 {
+  margin: 0;
+  font-size: 20px;
+  color: var(--text-primary);
+}
+
+.create-backup-form {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: var(--list-bg);
+  border-radius: var(--border-radius);
+}
+
+.create-backup-form input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 2px solid var(--border-color);
+  border-radius: var(--border-radius);
+  font-size: 14px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+}
+
+.create-backup-form input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.backup-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.backup-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: var(--card-bg);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+  transition: box-shadow 0.2s ease;
+}
+
+.backup-item:hover {
+  box-shadow: var(--shadow-hover);
+}
+
+.backup-icon {
+  font-size: 32px;
+  flex-shrink: 0;
+}
+
+.backup-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.backup-filename {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+  word-break: break-all;
+}
+
+.backup-meta {
+  font-size: 13px;
+  color: var(--text-secondary);
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.backup-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.backup-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-secondary);
+}
+
+.backup-empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+/* Auto backup toggle */
+.auto-backup-section {
+  margin-bottom: 24px;
+  padding: 16px;
+  background: var(--list-bg);
+  border-radius: var(--border-radius);
+}
+
+.auto-backup-section h3 {
+  margin: 0 0 12px;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+.auto-backup-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.auto-backup-toggle input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.auto-backup-toggle label {
+  font-size: 14px;
+  color: var(--text-primary);
+  cursor: pointer;
+}

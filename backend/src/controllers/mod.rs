@@ -16,3 +16,4 @@ pub mod templates;
 pub mod bulk_operations;
 pub mod permissions;
 pub mod oauth;
+pub mod backup;

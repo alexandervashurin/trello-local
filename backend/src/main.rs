@@ -110,6 +110,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/oauth/github/callback", get(controllers::oauth::github_callback))
         .route("/oauth/google", get(controllers::oauth::google_auth_url))
         .route("/oauth/google/callback", get(controllers::oauth::google_callback))
+        // Backup
+        .route("/backup", post(controllers::backup::create_backup).get(controllers::backup::list_backups))
+        .route("/backup/:id", get(controllers::backup::download_backup).delete(controllers::backup::delete_backup))
+        .route("/backup/:id/restore", post(controllers::backup::restore_backup))
         // Списки
         .route("/boards/:board_id/lists", post(controllers::lists::create_list))
         .route("/lists/:id", patch(controllers::lists::update_list).delete(controllers::lists::delete_list))

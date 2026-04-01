@@ -32,6 +32,7 @@ import { createChecklist, deleteChecklist, addChecklistItem, toggleChecklistItem
 import { openActivityModal, closeActivityModal, loadActivityLog, renderActivityLog } from './modules/activity.js';
 import { openAttachmentsModal, closeAttachmentsModal, closeImagePreview, openImagePreview, uploadAttachment, deleteAttachment, renderAttachments } from './modules/attachments.js';
 import { openPermissionsModal, closePermissionsModal, updatePermission, loadBoardPermissions, checkPermission, renderPermissionsSettings } from './modules/permissions.js';
+import { openBackupModal, closeBackupModal, createBackup, downloadBackup, restoreBackup, deleteBackup, toggleAutoBackup } from './modules/backup.js';
 
 // Экспорт в глобальную область для HTML onclick handlers
 window.toggleTheme = toggleTheme;
@@ -191,6 +192,14 @@ window.loadBoardPermissions = loadBoardPermissions;
 window.checkPermission = checkPermission;
 window.renderPermissionsSettings = renderPermissionsSettings;
 
+window.openBackupModal = openBackupModal;
+window.closeBackupModal = closeBackupModal;
+window.createBackup = createBackup;
+window.downloadBackup = downloadBackup;
+window.restoreBackup = restoreBackup;
+window.deleteBackup = deleteBackup;
+window.toggleAutoBackup = toggleAutoBackup;
+
 window.bulkMarkDone = bulkMarkDone;
 window.bulkMarkTodo = bulkMarkTodo;
 window.clearDueDate = clearDueDate;
@@ -227,6 +236,22 @@ if (searchInput) {
     const notificationsBtn = document.getElementById('notifications-btn');
     if (notificationsBtn) {
       notificationsBtn.style.display = 'inline-block';
+    }
+    const calendarBtn = document.getElementById('calendar-btn');
+    if (calendarBtn) {
+      calendarBtn.style.display = 'inline-block';
+    }
+    const sessionsBtn = document.getElementById('sessions-btn');
+    if (sessionsBtn) {
+      sessionsBtn.style.display = 'inline-block';
+    }
+    const backupBtn = document.getElementById('backup-btn');
+    if (backupBtn) {
+      backupBtn.style.display = 'inline-block';
+    }
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+      logoutBtn.style.display = 'inline-block';
     }
     startNotificationPolling();
   }
