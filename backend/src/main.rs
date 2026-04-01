@@ -155,13 +155,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(axum::middleware::from_fn(middleware::security_headers::security_headers))
         .with_state(pool);
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
-    println!("🚀 Trello Local запущен на http://{}", addr);
+    // Загрузка настроек из переменных окружения
+    let port: u16 = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string()).parse().unwrap_or(8080);
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+
+    println!("� Trello Local запущен на http://{}", addr);
     println!("📁 База данных: ./data/trello.db");
+    println!("� Для HTTPS используйте reverse proxy (nginx/Caddy)");
     println!("🛑 Нажмите Ctrl+C для остановки сервера");
 
     let listener = TcpListener::bind(&addr).await?;
-    
+
     // Запускаем сервер с обработкой Ctrl+C
     axum::serve(listener, app.into_make_service())
         .with_graceful_shutdown(async {

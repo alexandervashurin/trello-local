@@ -55,7 +55,7 @@
 
 | ID | Задача | Описание | Статус |
 |----|--------|----------|--------|
-| 3.1 | HTTPS поддержка | Встроенная или через reverse proxy | ⏳ Pending |
+| 3.1 | HTTPS поддержка | Документация для reverse proxy (nginx/Caddy) | ✅ Completed |
 | 3.2 | 2FA аутентификация | TOTP (Google Authenticator) | ⏳ Pending |
 | 3.3 | Гранулярные права | Детализированные разрешения (создание, редактирование, удаление) | ⏳ Pending |
 | 3.4 | OAuth2 провайдеры | Вход через GitHub, Google | ⏳ Pending |
