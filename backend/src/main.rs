@@ -67,6 +67,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/notifications/read-all", post(controllers::notifications::mark_all_read))
         .route("/notifications/unread-count", get(controllers::notifications::get_unread_count))
         .route("/notifications/:id", patch(controllers::notifications::mark_notification_read).delete(controllers::notifications::delete_notification))
+        // Шаблоны досок
+        .route("/templates", get(controllers::templates::get_templates))
+        .route("/templates/:id", get(controllers::templates::get_template).delete(controllers::templates::delete_template))
+        .route("/templates/:id/apply", post(controllers::templates::apply_template))
+        .route("/boards/:board_id/template", post(controllers::templates::create_template_from_board))
         // Пользователи
         .route("/users", get(controllers::users::get_users).post(controllers::users::create_user))
         .route("/users/:id", get(controllers::users::get_user))

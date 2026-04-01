@@ -180,6 +180,33 @@ pub async fn connect() -> Result<SqlitePool, Box<dyn std::error::Error>> {
         CREATE INDEX IF NOT EXISTS idx_checklist_items_checklist_id ON checklist_items(checklist_id);
         CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
         CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
+        CREATE TABLE IF NOT EXISTS board_templates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT,
+            is_public BOOLEAN NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS board_template_lists (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            template_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            position INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (template_id) REFERENCES board_templates(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS board_template_cards (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            list_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            content TEXT,
+            position INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (list_id) REFERENCES board_template_lists(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_board_templates_user_id ON board_templates(user_id);
+        CREATE INDEX IF NOT EXISTS idx_board_template_lists_template_id ON board_template_lists(template_id);
+        CREATE INDEX IF NOT EXISTS idx_board_template_cards_list_id ON board_template_cards(list_id);
         "#,
     )
     .execute(&pool)
