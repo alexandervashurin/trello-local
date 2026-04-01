@@ -62,6 +62,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Сессии
         .route("/sessions", get(controllers::sessions::get_sessions).delete(controllers::sessions::delete_all_sessions))
         .route("/sessions/:id", delete(controllers::sessions::delete_session))
+        // Уведомления
+        .route("/notifications", get(controllers::notifications::get_notifications).post(controllers::notifications::create_notification))
+        .route("/notifications/read-all", post(controllers::notifications::mark_all_read))
+        .route("/notifications/unread-count", get(controllers::notifications::get_unread_count))
+        .route("/notifications/:id", patch(controllers::notifications::mark_notification_read).delete(controllers::notifications::delete_notification))
         // Пользователи
         .route("/users", get(controllers::users::get_users).post(controllers::users::create_user))
         .route("/users/:id", get(controllers::users::get_user))

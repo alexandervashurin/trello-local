@@ -2207,5 +2207,151 @@ async function openDeleteAccount() {
   }
 }
 
+// === Уведомления ===
+
+// Опрос сервера на наличие новых уведомлений (каждые 10 секунд)
+let notificationPollingInterval = null;
+
+function startNotificationPolling() {
+  checkUnreadNotifications();
+  notificationPollingInterval = setInterval(checkUnreadNotifications, 10000);
+}
+
+function stopNotificationPolling() {
+  if (notificationPollingInterval) {
+    clearInterval(notificationPollingInterval);
+    notificationPollingInterval = null;
+  }
+}
+
+async function checkUnreadNotifications() {
+  try {
+    const count = await apiRequest('/api/notifications/unread-count');
+    updateNotificationBadge(count);
+  } catch (error) {
+    console.error('Ошибка проверки уведомлений:', error);
+  }
+}
+
+function updateNotificationBadge(count) {
+  const badge = document.getElementById('notification-badge');
+  if (badge) {
+    if (count > 0) {
+      badge.textContent = count > 99 ? '99+' : count;
+      badge.style.display = 'inline-block';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+}
+
+async function openNotificationsModal() {
+  const modal = document.getElementById('notifications-modal');
+  const notificationsList = document.getElementById('notifications-list');
+
+  modal.classList.add('open');
+  notificationsList.innerHTML = '<div class="loading">Загрузка...</div>';
+
+  try {
+    const notifications = await apiRequest('/api/notifications?limit=50');
+
+    if (!notifications || notifications.length === 0) {
+      notificationsList.innerHTML = '<div class="empty-state"><p>Нет уведомлений</p></div>';
+    } else {
+      notificationsList.innerHTML = notifications.map(n => `
+        <div class="notification-item ${n.is_read ? 'notification-read' : ''}" data-notification-id="${n.id}">
+          <div class="notification-header">
+            <span class="notification-icon">${getNotificationIcon(n.notification_type)}</span>
+            <span class="notification-title">${escapeHtml(n.title)}</span>
+            <span class="notification-time">${formatNotificationTime(n.created_at)}</span>
+          </div>
+          <div class="notification-message">${escapeHtml(n.message)}</div>
+          ${n.link ? `<button class="btn btn-sm" onclick="navigateTo('${n.link}')" style="margin-top:8px;">Перейти</button>` : ''}
+          ${!n.is_read ? `<button class="btn btn-sm btn-secondary" onclick="markNotificationRead(${n.id})" style="margin-top:8px;">Отметить как прочитанное</button>` : ''}
+        </div>
+      `).join('');
+    }
+  } catch (error) {
+    console.error(error);
+    notificationsList.innerHTML = '<div class="empty-state"><p>Ошибка загрузки уведомлений</p></div>';
+  }
+}
+
+function closeNotificationsModal() {
+  const modal = document.getElementById('notifications-modal');
+  modal.classList.remove('open');
+}
+
+function getNotificationIcon(type) {
+  const icons = {
+    'info': 'ℹ️',
+    'success': '✅',
+    'warning': '⚠️',
+    'error': '❌'
+  };
+  return icons[type] || icons['info'];
+}
+
+function formatNotificationTime(timestamp) {
+  const date = new Date(timestamp * 1000);
+  const now = new Date();
+  const diff = now - date;
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  if (minutes < 1) return 'Только что';
+  if (minutes < 60) return `${minutes} мин. назад`;
+  if (hours < 24) return `${hours} ч. назад`;
+  if (days < 7) return `${days} дн. назад`;
+  return date.toLocaleDateString('ru-RU');
+}
+
+async function markNotificationRead(notificationId) {
+  try {
+    await apiRequest(`/api/notifications/${notificationId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ is_read: true })
+    });
+
+    checkUnreadNotifications();
+    openNotificationsModal(); // Обновить список
+    showToast('Уведомление отмечено как прочитанное', 'success');
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось отметить уведомление', 'error');
+  }
+}
+
+async function markAllNotificationsRead() {
+  try {
+    await apiRequest('/api/notifications/read-all', {
+      method: 'POST'
+    });
+
+    checkUnreadNotifications();
+    openNotificationsModal(); // Обновить список
+    showToast('Все уведомления отмечены как прочитанные', 'success');
+  } catch (error) {
+    console.error(error);
+    showToast('Не удалось отметить уведомления', 'error');
+  }
+}
+
+function navigateTo(link) {
+  if (link) {
+    window.location.href = link;
+  }
+}
+
 // === Init ===
+// Показываем кнопку уведомлений если пользователь авторизован
+if (localStorage.getItem('token')) {
+  const notificationsBtn = document.getElementById('notifications-btn');
+  if (notificationsBtn) {
+    notificationsBtn.style.display = 'inline-block';
+  }
+  startNotificationPolling();
+}
+
 loadBoards();
