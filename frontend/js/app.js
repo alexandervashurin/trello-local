@@ -15,7 +15,7 @@ import { escapeHtml, formatDate, formatDateTime, formatRelativeTime, getInitials
 import { handleDragStart, handleDragOver, handleDrop, handleDragEnd } from './modules/drag-drop.js';
 import { startNotificationPolling, stopNotificationPolling, checkUnreadNotifications, loadNotifications, markAllNotificationsRead } from './modules/notifications.js';
 import { openProfileModal, closeProfileModal, saveProfile, openChangePassword, openDeleteAccount, setup2FA, confirm2FAEnable, disable2FA } from './modules/profile.js';
-import { loadSessions, deleteSession, deleteAllSessions, logoutAllSessions } from './modules/sessions.js';
+import { loadSessions, deleteSession, deleteAllSessions, logoutAllSessions, openSessionsModal, closeSessionsModal } from './modules/sessions.js';
 import { exportBoardToJson, exportBoardToCsv, getBoardStats, closeBoardStats } from './modules/export.js';
 import { toggleBulkModeFromModule, toggleCardSelectionFromModule, bulkMoveCards, bulkUpdateCards, bulkDeleteCards, bulkMarkDone, bulkMarkTodo } from './modules/bulk-ops.js';
 import { 
@@ -24,6 +24,13 @@ import {
   openCard, showCardModal, saveCardFromModal, closeCardModal
 } from './modules/boards.js';
 import { initCalendar, renderCalendar, previousMonth, nextMonth, goToToday, selectCalendarDay, openCalendarModal, closeCalendarModal } from './modules/calendar.js';
+import { openMembersModal, closeMembersModal, addMember, changeMemberRole, removeMember } from './modules/members.js';
+import { openInvitationsModal, closeInvitationsModal, createInvitation, copyInviteLink, deleteInvitation } from './modules/members.js';
+import { openCommentsModal, closeCommentsModal, addComment, deleteComment, editComment } from './modules/comments.js';
+import { openLabelsModal, closeLabelsModal, selectLabelColor, addLabel, deleteLabel, openLabelFilter, closeLabelFilter, applyLabelFilter } from './modules/labels.js';
+import { createChecklist, deleteChecklist, addChecklistItem, toggleChecklistItem, deleteChecklistItem, renderChecklists } from './modules/checklists.js';
+import { openActivityModal, closeActivityModal, loadActivityLog, renderActivityLog } from './modules/activity.js';
+import { openAttachmentsModal, closeAttachmentsModal, closeImagePreview, openImagePreview, uploadAttachment, deleteAttachment, renderAttachments } from './modules/attachments.js';
 
 // Экспорт в глобальную область для HTML onclick handlers
 window.toggleTheme = toggleTheme;
@@ -98,6 +105,9 @@ window.exportBoardToJson = exportBoardToJson;
 window.exportBoardToCsv = exportBoardToCsv;
 window.getBoardStats = getBoardStats;
 window.closeBoardStats = closeBoardStats;
+window.openSessionsModal = openSessionsModal;
+window.closeSessionsModal = closeSessionsModal;
+window.logoutAllSessions = logoutAllSessions;
 
 window.loadBoards = loadBoards;
 window.renderBoards = renderBoards;
@@ -122,8 +132,6 @@ window.goToToday = goToToday;
 window.selectCalendarDay = selectCalendarDay;
 window.openCalendarModal = openCalendarModal;
 window.closeCalendarModal = closeCalendarModal;
-window.closeSessionsModal = closeSessionsModal;
-window.logoutAllSessions = logoutAllSessions;
 window.closeNotificationsModal = closeNotificationsModal;
 window.openNotificationsModal = openNotificationsModal;
 window.closeMembersModal = closeMembersModal;
@@ -133,42 +141,56 @@ window.closeActivityModal = closeActivityModal;
 window.closeImagePreview = closeImagePreview;
 window.closeLabelFilter = closeLabelFilter;
 window.openMembersModal = openMembersModal;
-window.openInvitationsModal = openInvitationsModal;
-window.openCommentsModal = openCommentsModal;
-window.openActivityModal = openActivityModal;
-window.openImagePreview = openImagePreview;
-window.openLabelFilter = openLabelFilter;
+window.closeMembersModal = closeMembersModal;
 window.addMember = addMember;
+window.changeMemberRole = changeMemberRole;
+window.removeMember = removeMember;
+
+window.openInvitationsModal = openInvitationsModal;
+window.closeInvitationsModal = closeInvitationsModal;
 window.createInvitation = createInvitation;
+window.copyInviteLink = copyInviteLink;
+window.deleteInvitation = deleteInvitation;
+
+window.openCommentsModal = openCommentsModal;
+window.closeCommentsModal = closeCommentsModal;
 window.addComment = addComment;
+window.deleteComment = deleteComment;
+window.editComment = editComment;
+
+window.openLabelsModal = openLabelsModal;
+window.closeLabelsModal = closeLabelsModal;
+window.selectLabelColor = selectLabelColor;
 window.addLabel = addLabel;
+window.deleteLabel = deleteLabel;
+window.openLabelFilter = openLabelFilter;
+window.closeLabelFilter = closeLabelFilter;
+window.applyLabelFilter = applyLabelFilter;
+
 window.createChecklist = createChecklist;
-window.clearDueDate = clearDueDate;
+window.deleteChecklist = deleteChecklist;
+window.addChecklistItem = addChecklistItem;
+window.toggleChecklistItem = toggleChecklistItem;
+window.deleteChecklistItem = deleteChecklistItem;
+
+window.openActivityModal = openActivityModal;
+window.closeActivityModal = closeActivityModal;
+
+window.openAttachmentsModal = openAttachmentsModal;
+window.closeAttachmentsModal = closeAttachmentsModal;
+window.closeImagePreview = closeImagePreview;
+window.openImagePreview = openImagePreview;
+window.uploadAttachment = uploadAttachment;
+window.deleteAttachment = deleteAttachment;
+
 window.bulkMarkDone = bulkMarkDone;
 window.bulkMarkTodo = bulkMarkTodo;
+window.clearDueDate = clearDueDate;
 
-// Заглушки для функций, которые будут реализованы
-function closeSessionsModal() { document.getElementById('sessions-modal')?.classList.remove('open'); }
-function closeNotificationsModal() { document.getElementById('notifications-modal')?.classList.remove('open'); }
-function openNotificationsModal() { loadNotifications(); document.getElementById('notifications-modal')?.classList.add('open'); }
-function closeMembersModal() { document.getElementById('members-modal')?.classList.remove('open'); }
-function closeInvitationsModal() { document.getElementById('invitations-modal')?.classList.remove('open'); }
-function closeCommentsModal() { document.getElementById('comments-modal')?.classList.remove('open'); }
-function closeActivityModal() { document.getElementById('activity-modal')?.classList.remove('open'); }
-function closeImagePreview() { document.getElementById('image-preview-modal')?.classList.remove('open'); }
-function closeLabelFilter() { document.getElementById('label-filter-modal')?.classList.remove('open'); }
-function openMembersModal() { document.getElementById('members-modal')?.classList.add('open'); }
-function openInvitationsModal() { document.getElementById('invitations-modal')?.classList.add('open'); }
-function openCommentsModal() { document.getElementById('comments-modal')?.classList.add('open'); }
-function openActivityModal() { document.getElementById('activity-modal')?.classList.add('open'); }
-function openImagePreview() { document.getElementById('image-preview-modal')?.classList.add('open'); }
-function openLabelFilter() { document.getElementById('label-filter-modal')?.classList.add('open'); }
-function addMember() { showToast('Функция добавления участника', 'info'); }
-function createInvitation() { showToast('Функция создания приглашения', 'info'); }
-function addComment() { showToast('Функция добавления комментария', 'info'); }
-function addLabel() { showToast('Функция добавления метки', 'info'); }
-function createChecklist() { showToast('Функция создания чек-листа', 'info'); }
-function clearDueDate() { document.getElementById('card-due-date').value = ''; }
+function clearDueDate() { 
+  const input = document.getElementById('card-due-date');
+  if (input) input.value = ''; 
+}
 
 // === DOM Elements ===
 const boardsContainer = document.getElementById('boards');

@@ -9,9 +9,39 @@ export async function loadSessions() {
   try {
     const sessions = await apiRequest('/api/sessions');
     renderSessions(sessions);
+    return sessions;
   } catch (error) {
     console.error(error);
     showToast('Ошибка загрузки сессий', 'error');
+    return [];
+  }
+}
+
+export async function openSessionsModal() {
+  const modal = document.getElementById('sessions-modal');
+  if (modal) {
+    modal.classList.add('open');
+    await loadSessions();
+  }
+}
+
+export function closeSessionsModal() {
+  const modal = document.getElementById('sessions-modal');
+  if (modal) {
+    modal.classList.remove('open');
+  }
+}
+
+export async function logoutAllSessions() {
+  if (!confirm('Завершить все сессии кроме текущей?')) return;
+  
+  try {
+    await apiRequest('/api/sessions', { method: 'DELETE' });
+    showToast('Все сессии завершены', 'success');
+    await loadSessions();
+  } catch (error) {
+    console.error(error);
+    showToast('Ошибка завершения сессий', 'error');
   }
 }
 
