@@ -22,7 +22,9 @@ async fn init_db(pool: &SqlitePool) {
             avatar_color TEXT DEFAULT '#0079bf',
             bio TEXT,
             last_login INTEGER,
-            created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+            created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+            two_factor_enabled BOOLEAN DEFAULT 0,
+            two_factor_secret TEXT
         );
         CREATE TABLE IF NOT EXISTS boards (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -85,7 +87,7 @@ async fn test_create_board() {
     init_db(&pool).await;
 
     use backend::controllers::boards;
-    let app = axum::Router::new()
+    let app: axum::Router = axum::Router::new()
         .route("/api/boards", axum::routing::get(boards::get_boards).post(boards::create_board))
         .with_state(pool);
 
@@ -111,7 +113,7 @@ async fn test_get_boards() {
     init_db(&pool).await;
 
     use backend::controllers::boards;
-    let app = axum::Router::new()
+    let app: axum::Router = axum::Router::new()
         .route("/api/boards", axum::routing::get(boards::get_boards).post(boards::create_board))
         .with_state(pool);
 
@@ -158,7 +160,7 @@ async fn test_create_list() {
         .await
         .unwrap();
 
-    let app = axum::Router::new()
+    let app: axum::Router = axum::Router::new()
         .route("/api/boards/:board_id/lists", axum::routing::post(lists::create_list))
         .with_state(pool);
 
@@ -197,7 +199,7 @@ async fn test_create_card() {
         .await
         .unwrap();
 
-    let app = axum::Router::new()
+    let app: axum::Router = axum::Router::new()
         .route("/api/lists/:list_id/cards", axum::routing::post(cards::create_card))
         .with_state(pool);
 
@@ -222,7 +224,7 @@ async fn test_auth_register() {
     init_db(&pool).await;
 
     use backend::controllers::auth;
-    let app = axum::Router::new()
+    let app: axum::Router = axum::Router::new()
         .route("/api/auth/register", axum::routing::post(auth::register))
         .with_state(pool);
 
@@ -257,7 +259,7 @@ async fn test_auth_login() {
         .await
         .unwrap();
 
-    let app = axum::Router::new()
+    let app: axum::Router = axum::Router::new()
         .route("/api/auth/login", axum::routing::post(auth::login))
         .with_state(pool);
 
@@ -287,7 +289,7 @@ async fn test_search_boards() {
     sqlx::query("INSERT INTO boards (title, owner_id, is_shared) VALUES ('Project A', 1, 0)").execute(&pool).await.unwrap();
     sqlx::query("INSERT INTO boards (title, owner_id, is_shared) VALUES ('Project B', 1, 0)").execute(&pool).await.unwrap();
 
-    let app = axum::Router::new()
+    let app: axum::Router = axum::Router::new()
         .route("/api/boards", axum::routing::get(boards::get_boards))
         .with_state(pool);
 

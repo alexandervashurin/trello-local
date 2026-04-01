@@ -56,7 +56,7 @@
 | ID | Задача | Описание | Статус |
 |----|--------|----------|--------|
 | 3.1 | HTTPS поддержка | Документация для reverse proxy (nginx/Caddy) | ✅ Completed |
-| 3.2 | 2FA аутентификация | TOTP (Google Authenticator) | ⏳ Pending |
+| 3.2 | 2FA аутентификация | TOTP (Google Authenticator) | ✅ Completed |
 | 3.3 | Гранулярные права | Детализированные разрешения (создание, редактирование, удаление) | ⏳ Pending |
 | 3.4 | OAuth2 провайдеры | Вход через GitHub, Google | ⏳ Pending |
 | 3.5 | Backup/restore API | Автоматическое резервное копирование | ⏳ Pending |
@@ -211,6 +211,7 @@ cargo fmt --check
 | 2026-04-01 | Задачи 1.2, 1.3: CSP заголовки, CI/CD для cargo audit | ✅ Completed |
 | 2026-04-01 | Задача 1.4: Логирование событий безопасности (аудит логинов) | ✅ Completed |
 | 2026-04-01 | **Приоритет 1 завершён полностью** | 🎉 |
+| 2026-04-01 | Задача 3.2: 2FA аутентификация (TOTP) — backend (auth.rs, models, БД) + frontend (login.html, app.js) | ✅ Completed |
 
 ---
 

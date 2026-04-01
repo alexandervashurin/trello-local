@@ -2103,6 +2103,9 @@ window.closeProfileModal = closeProfileModal;
 window.saveProfile = saveProfile;
 window.openChangePassword = openChangePassword;
 window.openDeleteAccount = openDeleteAccount;
+window.setup2FA = setup2FA;
+window.confirm2FAEnable = confirm2FAEnable;
+window.disable2FA = disable2FA;
 
 // === Profile Management ===
 async function openProfileModal() {
@@ -2114,6 +2117,23 @@ async function openProfileModal() {
 
   try {
     const user = await apiRequest('/api/profile');
+    const twoFAStatus = await apiRequest('/api/2fa/status').catch(() => ({ enabled: false }));
+
+    const twoFAHtml = twoFAStatus.enabled
+      ? `
+        <div class="profile-field" style="background:#e3fcef;padding:16px;border-radius:8px;border-left:4px solid #61bd4f;">
+          <label>🔐 Двухфакторная аутентификация</label>
+          <p style="color:#006644;font-size:14px;margin:8px 0;">✅ Двухфакторная аутентификация включена</p>
+          <button class="btn btn-danger" onclick="disable2FA()" style="margin-top:8px;">🔓 Отключить 2FA</button>
+        </div>
+      `
+      : `
+        <div class="profile-field" style="background:#fff0b3;padding:16px;border-radius:8px;border-left:4px solid #f5a623;">
+          <label>🔐 Двухфакторная аутентификация</label>
+          <p style="color:#856404;font-size:14px;margin:8px 0;">⚠️ Двухфакторная аутентификация не включена</p>
+          <button class="btn btn-primary" onclick="setup2FA()" style="margin-top:8px;">🔑 Настроить 2FA</button>
+        </div>
+      `;
 
     content.innerHTML = `
       <div class="profile-form">
@@ -2151,6 +2171,8 @@ async function openProfileModal() {
             <label>🕐 Последний вход</label>
             <input type="text" value="${user.last_login ? new Date(user.last_login * 1000).toLocaleString('ru-RU') : '—'}" disabled style="background:#f4f5f7;">
           </div>
+
+          ${twoFAHtml}
         </div>
 
         <div class="profile-actions" style="display:flex; gap:10px; margin-top:20px; flex-wrap:wrap;">
@@ -2524,6 +2546,113 @@ if (localStorage.getItem('token')) {
     notificationsBtn.style.display = 'inline-block';
   }
   startNotificationPolling();
+}
+
+// === 2FA Functions ===
+
+/// Настройка 2FA
+async function setup2FA() {
+  try {
+    const setupData = await apiRequest('/api/2fa/setup', {
+      method: 'POST',
+      body: JSON.stringify({ code: 'setup' })
+    });
+
+    // Показываем модальное окно с QR кодом
+    const modal = document.getElementById('profile-modal');
+    const content = document.getElementById('profile-content');
+
+    content.innerHTML = `
+      <div class="profile-form">
+        <h3 style="text-align:center;margin-bottom:20px;">🔐 Настройка двухфакторной аутентификации</h3>
+        
+        <div style="text-align:center;margin:20px 0;">
+          <img src="${setupData.qr_code}" alt="QR Code" style="max-width:256px;border:1px solid #dfe1e6;border-radius:8px;padding:8px;background:white;">
+        </div>
+        
+        <div style="background:#f4f5f7;padding:16px;border-radius:8px;margin:16px 0;">
+          <h4 style="margin:0 0 8px;">📱 Инструкция:</h4>
+          <ol style="margin:0;padding-left:20px;line-height:1.8;">
+            <li>Установите приложение аутентификации (Google Authenticator, Authy, Microsoft Authenticator)</li>
+            <li>Отсканируйте QR-код выше</li>
+            <li>Введите 6-значный код из приложения для подтверждения</li>
+          </ol>
+        </div>
+        
+        <div style="background:#fff0b3;padding:12px;border-radius:8px;margin:16px 0;">
+          <p style="margin:0;color:#856404;font-size:14px;">
+            <strong>⚠️ Секретный ключ:</strong> <code style="background:#fff;padding:4px 8px;border-radius:4px;font-size:12px;">${setupData.secret}</code>
+          </p>
+          <p style="margin:8px 0 0;color:#856404;font-size:12px;">Сохраните этот ключ в безопасном месте для восстановления доступа!</p>
+        </div>
+        
+        <div style="margin-top:20px;">
+          <label>🔢 Код из приложения:</label>
+          <input type="text" id="2fa-setup-code" placeholder="000000" maxlength="6" style="text-align:center;font-size:20px;letter-spacing:4px;margin-top:8px;">
+        </div>
+        
+        <div class="profile-actions" style="display:flex;gap:10px;margin-top:20px;">
+          <button class="btn btn-primary" onclick="confirm2FAEnable()" style="flex:1;">✅ Подтвердить и включить 2FA</button>
+          <button class="btn btn-secondary" onclick="openProfileModal()" style="flex:1;">✕ Отмена</button>
+        </div>
+      </div>
+    `;
+
+    modal.classList.add('open');
+  } catch (error) {
+    console.error(error);
+    showToast('Ошибка настройки 2FA', 'error');
+  }
+}
+
+/// Подтверждение включения 2FA
+async function confirm2FAEnable() {
+  const code = document.getElementById('2fa-setup-code').value.trim();
+
+  if (!code || code.length !== 6) {
+    showToast('Введите 6-значный код', 'error');
+    return;
+  }
+
+  try {
+    await apiRequest('/api/2fa/enable', {
+      method: 'POST',
+      body: JSON.stringify({ code, enable: true })
+    });
+
+    showToast('Двухфакторная аутентификация включена!', 'success');
+    openProfileModal(); // Обновляем профиль
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'Неверный код 2FA', 'error');
+  }
+}
+
+/// Отключение 2FA
+async function disable2FA() {
+  const code = prompt('Введите текущий код из приложения аутентификации для отключения 2FA:');
+  
+  if (!code || code.length !== 6) {
+    showToast('Введите 6-значный код', 'error');
+    return;
+  }
+
+  if (!confirm('Вы уверены, что хотите отключить двухфакторную аутентификацию?')) {
+    return;
+  }
+
+  try {
+    await apiRequest('/api/2fa/enable', {
+      method: 'POST',
+      body: JSON.stringify({ code, enable: false })
+    });
+
+    showToast('Двухфакторная аутентификация отключена', 'success');
+    openProfileModal(); // Обновляем профиль
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'Неверный код 2FA', 'error');
+  }
 }
 
 loadBoards();

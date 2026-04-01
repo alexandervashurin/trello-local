@@ -10,6 +10,8 @@ pub struct User {
     pub bio: Option<String>,
     pub last_login: Option<i64>,
     pub created_at: i64,
+    pub two_factor_enabled: Option<bool>,
+    pub two_factor_secret: Option<String>,
 }
 
 #[derive(Serialize, FromRow, Clone)]
@@ -22,6 +24,8 @@ pub struct UserWithPassword {
     pub bio: Option<String>,
     pub last_login: Option<i64>,
     pub created_at: i64,
+    pub two_factor_enabled: Option<bool>,
+    pub two_factor_secret: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -76,4 +80,39 @@ pub struct SessionInfo {
     pub expires_at: i64,
     pub last_activity: i64,
     pub is_current: bool,
+}
+
+/// Данные для включения 2FA
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TwoFASetup {
+    pub secret: String,
+    pub uri: String,
+    pub qr_code: String,
+}
+
+/// Данные для проверки 2FA кода
+#[derive(Deserialize, Debug)]
+pub struct TwoFACode {
+    pub code: String,
+}
+
+/// Данные для включения/выключения 2FA
+#[derive(Deserialize, Debug)]
+pub struct TwoFAEnable {
+    pub code: String,
+    pub enable: bool,
+}
+
+/// Response с информацией о 2FA статусе
+#[derive(Serialize, Debug)]
+pub struct TwoFAStatus {
+    pub enabled: bool,
+}
+
+/// Response для временного токена после успешного ввода пароля
+#[derive(Serialize, Debug)]
+pub struct TwoFATempToken {
+    pub temp_token: String,
+    pub user_id: i64,
+    pub username: String,
 }

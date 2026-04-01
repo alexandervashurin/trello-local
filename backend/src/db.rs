@@ -248,6 +248,16 @@ pub async fn connect() -> Result<SqlitePool, Box<dyn std::error::Error>> {
         .await
         .ok();
 
+    // Добавляем поля для 2FA аутентификации
+    sqlx::query("ALTER TABLE users ADD COLUMN two_factor_enabled BOOLEAN DEFAULT 0")
+        .execute(&pool)
+        .await
+        .ok();
+    sqlx::query("ALTER TABLE users ADD COLUMN two_factor_secret TEXT")
+        .execute(&pool)
+        .await
+        .ok();
+
     // Создаём пользователя по умолчанию
     sqlx::query(
         "INSERT OR IGNORE INTO users (id, username, created_at) VALUES (1, 'default', strftime('%s', 'now'))",

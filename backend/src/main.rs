@@ -50,15 +50,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let auth_routes = Router::new()
         .route("/register", post(controllers::auth::register))
         .route("/login", post(controllers::auth::login))
+        .route("/2fa/verify", post(controllers::auth::verify_2fa))
         .layer(axum::middleware::from_fn_with_state(
             auth_rate_limiter,
             middleware::rate_limit::rate_limit_middleware,
         ));
 
+    // 2FA роуты (требуют аутентификации)
+    let two_fa_routes = Router::new()
+        .route("/setup", post(controllers::auth::generate_2fa_setup))
+        .route("/enable", post(controllers::auth::enable_2fa))
+        .route("/status", get(controllers::auth::get_2fa_status));
+
     // API роуты с middleware
     let api_routes = Router::new()
         // Auth (с rate limiting)
         .nest("/auth", auth_routes)
+        // 2FA (требуют аутентификации)
+        .nest("/2fa", two_fa_routes)
         // Сессии
         .route("/sessions", get(controllers::sessions::get_sessions).delete(controllers::sessions::delete_all_sessions))
         .route("/sessions/:id", delete(controllers::sessions::delete_session))

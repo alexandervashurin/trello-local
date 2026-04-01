@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git tag *)",
+      "Bash(gh *)",
+      "Bash(cargo clean)",
+      "Bash(sqlite3 *)",
+      "Bash(curl *)",
+      "Bash(kill *)",
+      "Bash(sleep *)",
+      "Bash(./target/release/backend)",
+      "Bash(lsof *)",
+      "Bash(netstat *)",
+      "Bash(ss *)",
+      "Bash(cargo doc *)",
+      "Bash(grep *)",
+      "Bash(sed *)"
+    ]
+  },
+  "$version": 3
+}
