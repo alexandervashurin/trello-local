@@ -59,7 +59,7 @@
 | 3.2 | 2FA аутентификация | TOTP (Google Authenticator) | ✅ Completed |
 | 3.3 | Гранулярные права | Детализированные разрешения (создание, редактирование, удаление) | ✅ Completed |
 | 3.4 | OAuth2 провайдеры | Вход через GitHub, Google | ✅ Completed |
-| 3.5 | Backup/restore API | Автоматическое резервное копирование | ⏳ Pending |
+| 3.5 | Backup/restore API | Автоматическое резервное копирование | ✅ Completed |
 
 ### Приоритет 4: Оптимизация (постоянно)
 
@@ -215,6 +215,8 @@ cargo fmt --check
 | 2026-04-01 | Декомпозиция frontend/app.js (2659 строк) на 21 ES6 модуль по 50-150 строк | ✅ Completed |
 | 2026-04-01 | Задача 3.3: Гранулярные права доступа — backend (permissions.rs, БД) + frontend (permissions.js) | ✅ Completed |
 | 2026-04-01 | Задача 3.4: OAuth2 провайдеры — backend (oauth.rs, БД) + frontend (login.html) | ✅ Completed |
+| 2026-04-01 | Декомпозиция style.css (1606 строк) на 16 CSS модулей | ✅ Completed |
+| 2026-04-01 | Задача 3.5: Backup/restore API — backend (backup.rs, БД) + frontend (backup.js, backup.css) | ✅ Completed |
 
 ---
 
