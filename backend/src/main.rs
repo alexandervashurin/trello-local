@@ -105,6 +105,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/boards/:board_id/permissions", get(controllers::permissions::get_board_permissions))
         .route("/boards/:board_id/permissions/:role", patch(controllers::permissions::update_role_permissions))
         .route("/boards/:board_id/permissions/:role/:permission", get(controllers::permissions::check_permission))
+        // OAuth2
+        .route("/oauth/github", get(controllers::oauth::github_auth_url))
+        .route("/oauth/github/callback", get(controllers::oauth::github_callback))
+        .route("/oauth/google", get(controllers::oauth::google_auth_url))
+        .route("/oauth/google/callback", get(controllers::oauth::google_callback))
         // Списки
         .route("/boards/:board_id/lists", post(controllers::lists::create_list))
         .route("/lists/:id", patch(controllers::lists::update_list).delete(controllers::lists::delete_list))

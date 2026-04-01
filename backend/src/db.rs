@@ -275,6 +275,31 @@ pub async fn connect() -> Result<SqlitePool, Box<dyn std::error::Error>> {
         .await
         .ok();
 
+    // Таблица для OAuth2 аккаунтов
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS oauth_accounts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            provider TEXT NOT NULL,
+            provider_user_id TEXT NOT NULL,
+            access_token TEXT NOT NULL,
+            refresh_token TEXT,
+            expires_at INTEGER,
+            created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            UNIQUE(provider, provider_user_id)
+        )",
+    )
+    .execute(&pool)
+    .await
+    .ok();
+
+    // Добавляем поля для OAuth2 в users
+    sqlx::query("ALTER TABLE users ADD COLUMN oauth_enabled BOOLEAN DEFAULT 0")
+        .execute(&pool)
+        .await
+        .ok();
+
     // Создаём пользователя по умолчанию
     sqlx::query(
         "INSERT OR IGNORE INTO users (id, username, created_at) VALUES (1, 'default', strftime('%s', 'now'))",

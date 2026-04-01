@@ -29,7 +29,7 @@ fn get_jwt_secret() -> Vec<u8> {
 }
 
 /// Генерация JWT токена
-fn generate_token(user_id: i64, username: &str, two_factor_verified: bool) -> Result<String, (StatusCode, String)> {
+pub fn generate_token(user_id: i64, username: &str, two_factor_verified: bool) -> Result<String, (StatusCode, String)> {
     let expiration = SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("Время не может идти вспять")
