@@ -14,6 +14,29 @@
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
   --shadow-hover: 0 2px 8px rgba(0, 0, 0, 0.15);
   --border-radius: 6px;
+  --modal-bg: #ffffff;
+  --input-bg: #ffffff;
+  --border-color: #dfe1e6;
+}
+
+/* Тёмная тема */
+[data-theme="dark"] {
+  --primary-color: #0079bf;
+  --primary-hover: #0064a0;
+  --secondary-color: #8c9bb0;
+  --danger-color: #cf514c;
+  --success-color: #57a852;
+  --bg-color: #1a1d21;
+  --board-bg: #25282d;
+  --list-bg: #2d313a;
+  --card-bg: #343842;
+  --text-primary: #e4e6eb;
+  --text-secondary: #b0b3b8;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-hover: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --modal-bg: #2d313a;
+  --input-bg: #343842;
+  --border-color: #4e5259;
 }
 
 * {
@@ -70,12 +93,22 @@ body {
   width: 220px;
   background: rgba(255, 255, 255, 0.95);
   transition: width 0.2s ease;
+  color: var(--text-primary);
 }
 
 #search-input:focus {
   outline: none;
   width: 280px;
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5);
+}
+
+[data-theme="dark"] #search-input {
+  background: var(--input-bg);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] #search-input:focus {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
 }
 
 /* Buttons */
@@ -381,18 +414,25 @@ body {
 
 .add-list-input {
   padding: 10px 12px;
-  border: 2px solid #dfe1e6;
+  border: 2px solid var(--border-color);
   border-radius: var(--border-radius);
   font-size: 14px;
   width: 100%;
   transition: border-color 0.15s ease;
   word-wrap: break-word;
   overflow-wrap: break-word;
+  background: var(--input-bg);
+  color: var(--text-primary);
 }
 
 .add-list-input:focus {
   outline: none;
   border-color: var(--primary-color);
+}
+
+[data-theme="dark"] .add-list-input {
+  background: var(--input-bg);
+  color: var(--text-primary);
 }
 
 .add-list-btns {
@@ -455,6 +495,12 @@ body {
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
   animation: slideIn 0.2s ease;
   width: calc(100% - 40px);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .modal-content {
+  background: var(--modal-bg);
+  color: var(--text-primary);
 }
 
 .modal-header {

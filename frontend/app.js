@@ -9,6 +9,30 @@ let currentCardId = null;
 let currentCardData = null;
 let isLoading = false;
 
+// === Тема (Тёмная/Светлая) ===
+// Загрузка сохранённой темы при старте
+(function initTheme() {
+  const savedTheme = localStorage.getItem('theme') || 'light';
+  document.documentElement.setAttribute('data-theme', savedTheme);
+  updateThemeButton(savedTheme);
+})();
+
+function toggleTheme() {
+  const currentTheme = document.documentElement.getAttribute('data-theme');
+  const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', newTheme);
+  localStorage.setItem('theme', newTheme);
+  updateThemeButton(newTheme);
+}
+
+function updateThemeButton(theme) {
+  const btn = document.getElementById('theme-toggle');
+  if (btn) {
+    btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+    btn.title = theme === 'dark' ? 'Светлая тема' : 'Тёмная тема';
+  }
+}
+
 // === DOM Elements ===
 const boardsContainer = document.getElementById('boards');
 const createBoardBtn = document.getElementById('create-board-btn');
