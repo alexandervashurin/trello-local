@@ -19,7 +19,9 @@
       "Bash(sed *)",
       "Bash(mkdir *)",
       "Bash(mv *)",
-      "Bash(find *)"
+      "Bash(find *)",
+      "Bash(rm *)",
+      "Bash(git *)"
     ]
   },
   "$version": 3
