@@ -82,6 +82,15 @@ pub async fn register(
     // Сохраняем сессию (без user_agent и ip для тестов)
     let _ = sessions::save_session(&pool, user.id, &token, None, None).await;
 
+    // Логирование успешной регистрации
+    tracing::info!(
+        target: "security",
+        username = %payload.username,
+        user_id = user.id,
+        event = "register_success",
+        "Успешная регистрация нового пользователя"
+    );
+
     Ok(Json(AuthToken {
         token,
         user_id: user.id,
@@ -100,14 +109,53 @@ pub async fn login(
     .bind(&payload.username)
     .fetch_one(&pool)
     .await
-    .map_err(|_| (StatusCode::UNAUTHORIZED, "Неверное имя пользователя или пароль".to_string()))?;
+    .map_err(|_| {
+        // Логирование неудачной попытки входа (пользователь не найден)
+        tracing::warn!(
+            target: "security",
+            username = %payload.username,
+            event = "login_failed",
+            reason = "user_not_found",
+            "Неудачная попытка входа: пользователь не найден"
+        );
+        (StatusCode::UNAUTHORIZED, "Неверное имя пользователя или пароль".to_string())
+    })?;
 
     let valid = bcrypt::verify(&payload.password, &user_with_password.password_hash)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .map_err(|e| {
+            // Логирование ошибки проверки пароля
+            tracing::error!(
+                target: "security",
+                username = %payload.username,
+                event = "login_error",
+                reason = "bcrypt_error",
+                error = %e,
+                "Ошибка при проверке пароля"
+            );
+            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+        })?;
 
     if !valid {
+        // Логирование неудачной попытки входа (неверный пароль)
+        tracing::warn!(
+            target: "security",
+            username = %payload.username,
+            user_id = user_with_password.id,
+            event = "login_failed",
+            reason = "invalid_password",
+            "Неудачная попытка входа: неверный пароль"
+        );
         return Err((StatusCode::UNAUTHORIZED, "Неверное имя пользователя или пароль".to_string()));
     }
+
+    // Успешный вход
+    tracing::info!(
+        target: "security",
+        username = %payload.username,
+        user_id = user_with_password.id,
+        event = "login_success",
+        "Успешный вход пользователя"
+    );
 
     // Обновляем last_login
     let _ = sqlx::query("UPDATE users SET last_login = strftime('%s', 'now') WHERE id = ?")

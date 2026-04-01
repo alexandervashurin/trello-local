@@ -39,7 +39,7 @@
 | 1.1 | Замена `.unwrap()` на `.expect()` | 18 `unwrap()` в контроллерах → `expect()` с сообщениями | `controllers/*.rs` | ✅ Completed |
 | 1.2 | Content Security Policy | Добавить CSP заголовки для XSS-защиты | `main.rs`, `middleware/` | ✅ Completed |
 | 1.3 | Автоматизация cargo audit | CI/CD pipeline для проверки уязвимостей | `.github/workflows/` | ✅ Completed |
-| 1.4 | Логирование событий безопасности | Аудит логинов, неудачных попыток входа | `controllers/auth.rs`, БД | ⏳ Pending |
+| 1.4 | Логирование событий безопасности | Аудит логинов, неудачных попыток входа | `controllers/auth.rs`, `users.rs` | ✅ Completed |
 
 ### Приоритет 2: Функциональные улучшения (2-4 недели)
 
@@ -77,10 +77,11 @@
 ```
 backend/src/
 ├── controllers/
-│   ├── auth.rs          # Приоритет 1.4
+│   ├── auth.rs          # Приоритет 1.4 ✅
 │   ├── calendar.rs      # Готово ✅
 │   ├── export.rs        # Готово ✅
 │   ├── sessions.rs      # Готово ✅
+│   ├── users.rs         # Приоритет 1.4 ✅
 │   └── checklists.rs    # Готово ✅
 ├── middleware/
 │   ├── auth.rs          # Готово ✅
@@ -208,6 +209,8 @@ cargo fmt --check
 | 2026-04-01 | Первоначальное создание плана | — |
 | 2026-04-01 | Задача 1.1: Замена `.unwrap()` на `.expect()` (18 замен), исправление clippy warnings | ✅ Completed |
 | 2026-04-01 | Задачи 1.2, 1.3: CSP заголовки, CI/CD для cargo audit | ✅ Completed |
+| 2026-04-01 | Задача 1.4: Логирование событий безопасности (аудит логинов) | ✅ Completed |
+| 2026-04-01 | **Приоритет 1 завершён полностью** | 🎉 |
 
 ---
 

@@ -151,9 +151,28 @@ pub async fn change_password(
 
     // Проверяем текущий пароль
     let valid = bcrypt::verify(&payload.current_password, &user_with_password.password_hash)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .map_err(|e| {
+            tracing::error!(
+                target: "security",
+                user_id = claims.user_id,
+                username = %claims.username,
+                event = "password_change_error",
+                reason = "bcrypt_error",
+                error = %e,
+                "Ошибка при проверке текущего пароля"
+            );
+            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+        })?;
 
     if !valid {
+        tracing::warn!(
+            target: "security",
+            user_id = claims.user_id,
+            username = %claims.username,
+            event = "password_change_failed",
+            reason = "invalid_current_password",
+            "Неудачная смена пароля: неверный текущий пароль"
+        );
         return Err((StatusCode::UNAUTHORIZED, "Неверный текущий пароль".to_string()));
     }
 
@@ -183,6 +202,15 @@ pub async fn change_password(
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
+    // Логирование успешной смены пароля
+    tracing::info!(
+        target: "security",
+        user_id = claims.user_id,
+        username = %claims.username,
+        event = "password_change_success",
+        "Пароль успешно изменён"
+    );
+
     Ok(Json(()))
 }
 
@@ -204,11 +232,39 @@ pub async fn delete_account(
     })?;
 
     let valid = bcrypt::verify(&payload.password, &user_with_password.password_hash)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .map_err(|e| {
+            tracing::error!(
+                target: "security",
+                user_id = claims.user_id,
+                username = %claims.username,
+                event = "delete_account_error",
+                reason = "bcrypt_error",
+                error = %e,
+                "Ошибка при проверке пароля для удаления аккаунта"
+            );
+            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+        })?;
 
     if !valid {
+        tracing::warn!(
+            target: "security",
+            user_id = claims.user_id,
+            username = %claims.username,
+            event = "delete_account_failed",
+            reason = "invalid_password",
+            "Неудачное удаление аккаунта: неверный пароль"
+        );
         return Err((StatusCode::UNAUTHORIZED, "Неверный пароль".to_string()));
     }
+
+    // Логирование перед удалением аккаунта
+    tracing::info!(
+        target: "security",
+        user_id = claims.user_id,
+        username = %claims.username,
+        event = "delete_account_requested",
+        "Запрошено удаление аккаунта"
+    );
 
     // Удаляем пользователя (каскадно удалит все связанные данные)
     sqlx::query("DELETE FROM users WHERE id = ?")
@@ -216,6 +272,15 @@ pub async fn delete_account(
         .execute(&pool)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // Логирование успешного удаления аккаунта
+    tracing::info!(
+        target: "security",
+        user_id = claims.user_id,
+        username = %claims.username,
+        event = "delete_account_success",
+        "Аккаунт успешно удалён"
+    );
 
     Ok(Json(()))
 }
