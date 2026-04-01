@@ -94,7 +94,7 @@ pub async fn save_session(
     let token_hash = hash_token(token);
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
+        .expect("Время не может идти вспять")
         .as_secs() as i64;
     let expires_at = now + 60 * 60 * 24 * 7; // 7 дней
 
@@ -122,7 +122,7 @@ pub async fn update_session_activity(
     let token_hash = hash_token(token);
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
+        .expect("Время не может идти вспять")
         .as_secs() as i64;
 
     sqlx::query(
@@ -144,7 +144,7 @@ pub async fn is_session_valid(
     let token_hash = hash_token(token);
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
+        .expect("Время не может идти вспять")
         .as_secs() as i64;
 
     let result: Option<(i64,)> = sqlx::query_as(

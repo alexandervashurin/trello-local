@@ -37,6 +37,9 @@ pub struct LabelInfo {
     pub color: String,
 }
 
+/// Тип для строки результата поиска карточек
+type CardSearchRow = (i64, String, Option<String>, bool, Option<i64>, i64, String, i64, String);
+
 /// Поиск карточек на доске
 pub async fn search_cards_on_board(
     Path(board_id): Path<i64>,
@@ -44,7 +47,7 @@ pub async fn search_cards_on_board(
     Query(query): Query<CardSearchQuery>,
 ) -> Result<Json<Vec<CardSearchResult>>, (StatusCode, String)> {
     // Построение запроса в зависимости от параметров
-    let cards: Vec<(i64, String, Option<String>, bool, Option<i64>, i64, String, i64, String)> = if query.q.is_none() && query.label_color.is_none() && query.label_name.is_none() && query.done.is_none() {
+    let cards: Vec<CardSearchRow> = if query.q.is_none() && query.label_color.is_none() && query.label_name.is_none() && query.done.is_none() {
         // Без фильтров
         sqlx::query_as(
             r#"
@@ -200,7 +203,7 @@ pub async fn global_card_search(
 ) -> Result<Json<Vec<CardSearchResult>>, (StatusCode, String)> {
     let search_pattern = query.q.map(|q| format!("%{}%", q));
 
-    let cards: Vec<(i64, String, Option<String>, bool, Option<i64>, i64, String, i64, String)> = if let Some(pattern) = &search_pattern {
+    let cards: Vec<CardSearchRow> = if let Some(pattern) = &search_pattern {
         sqlx::query_as(
             r#"
             SELECT 

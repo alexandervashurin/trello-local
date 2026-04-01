@@ -130,7 +130,7 @@ pub async fn update_card(
 
     // Логирование изменений
     let mut changes = Vec::new();
-    if payload.title.is_some() && payload.title.as_ref().map(|s| s.as_str()) != Some(current.title.as_str()) {
+    if payload.title.is_some() && payload.title.as_deref() != Some(current.title.as_str()) {
         changes.push(format!("название → \"{}\"", new_title));
     }
     if payload.content.is_some() && payload.content != current.content {
@@ -301,7 +301,7 @@ pub async fn update_label(
     // Логирование
     if let Some(board_id) = get_board_id_by_card_id(&pool, card_id).await {
         let mut changes = Vec::new();
-        if payload.name.is_some() && payload.name.as_ref().map(|s| s.as_str()) != Some(current.name.as_str()) {
+        if payload.name.is_some() && payload.name.as_deref() != Some(current.name.as_str()) {
             changes.push(format!("название → \"{}\"", new_name));
         }
         if payload.color.is_some() && payload.color != Some(current.color) {
@@ -449,6 +449,7 @@ pub async fn get_activity_log(
 }
 
 /// Вспомогательная функция для логирования действий
+#[allow(clippy::too_many_arguments)]
 pub async fn log_activity(
     pool: &SqlitePool,
     board_id: i64,

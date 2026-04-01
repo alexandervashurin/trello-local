@@ -192,7 +192,7 @@ pub async fn update_board(
         changes.push(format!("название → \"{}\"", payload.title.as_ref().unwrap_or(&board.title)));
     }
     if payload.is_shared.is_some() {
-        changes.push(format!("общий доступ → {}", if payload.is_shared.unwrap() { "включён" } else { "выключен" }));
+        changes.push(format!("общий доступ → {}", if payload.is_shared.expect("is_shared должен быть установлен") { "включён" } else { "выключен" }));
     }
     if payload.visibility.is_some() {
         changes.push(format!("видимость → {}", payload.visibility.as_ref().unwrap_or(&board.visibility)));
@@ -497,7 +497,7 @@ pub async fn create_invitation(
     let expires_at = payload.expires_in_hours.map(|hours| {
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .expect("Время не может идти вспять")
             .as_secs() as i64 + hours * 3600
     });
     

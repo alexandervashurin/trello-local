@@ -67,10 +67,10 @@ pub async fn export_board_json(
             .expect("Content-Disposition должен быть валидным заголовком"),
     );
 
-    Ok(Response::builder()
+    Response::builder()
         .status(StatusCode::OK)
         .body(Body::from(json))
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
 /// Экспорт доски в CSV
@@ -122,10 +122,10 @@ pub async fn export_board_csv(
             .expect("Content-Disposition должен быть валидным заголовком"),
     );
 
-    Ok(Response::builder()
+    Response::builder()
         .status(StatusCode::OK)
         .body(Body::from(csv))
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
 /// Получить данные для экспорта доски

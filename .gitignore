@@ -14,3 +14,7 @@
 .idea/
 *.swp
 *~
+
+# Файлы окружения и сервисы
+.env
+backend/trello-backend.service

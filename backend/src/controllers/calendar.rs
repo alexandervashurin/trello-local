@@ -49,6 +49,9 @@ pub struct CalendarResponse {
     pub overdue_cards: u32,
 }
 
+/// Тип для строки результата запроса карточек
+type CardRow = (i64, String, bool, i64, i64, String, i64, String);
+
 /// Получить календарь дедлайнов на месяц
 pub async fn get_calendar(
     Path(board_id): Path<i64>,
@@ -64,7 +67,7 @@ pub async fn get_calendar(
         "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
         "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
     ];
-    let month_name = if month >= 1 && month <= 12 {
+    let month_name = if (1..=12).contains(&month) {
         month_names[(month - 1) as usize]
     } else {
         "Неизвестно"
@@ -75,31 +78,31 @@ pub async fn get_calendar(
 
     // Получаем карточки с дедлайнами на этот месяц
     let start_timestamp = chrono::NaiveDate::from_ymd_opt(year, month, 1)
-        .unwrap()
+        .expect("Некорректная дата начала месяца")
         .and_hms_opt(0, 0, 0)
-        .unwrap()
+        .expect("Некорректное время 00:00:00")
         .and_utc()
         .timestamp();
 
     let end_timestamp = chrono::NaiveDate::from_ymd_opt(year, month, days_in_month)
-        .unwrap()
+        .expect("Некорректная дата конца месяца")
         .and_hms_opt(23, 59, 59)
-        .unwrap()
+        .expect("Некорректное время 23:59:59")
         .and_utc()
         .timestamp();
 
-    let cards: Vec<(i64, String, bool, i64, i64, String, i64, String)> = sqlx::query_as(
+    let cards: Vec<CardRow> = sqlx::query_as(
         r#"
-        SELECT 
+        SELECT
             c.id, c.title, c.done, c.due_date,
             c.list_id, l.title as list_title,
             l.board_id, b.title as board_title
         FROM cards c
         INNER JOIN lists l ON c.list_id = l.id
         INNER JOIN boards b ON l.board_id = b.id
-        WHERE l.board_id = ? 
+        WHERE l.board_id = ?
           AND c.due_date IS NOT NULL
-          AND c.due_date >= ? 
+          AND c.due_date >= ?
           AND c.due_date <= ?
         ORDER BY c.due_date, c.id
         "#,
@@ -130,10 +133,10 @@ pub async fn get_calendar(
 
         // Получаем день месяца из timestamp
         let day = chrono::DateTime::from_timestamp(due_date, 0)
-            .map(|dt| dt.day())
-            .unwrap_or(1);
+            .expect("Некорректный timestamp дедлайна")
+            .day();
 
-        cards_by_day.entry(day).or_insert_with(Vec::new).push(CalendarCard {
+        cards_by_day.entry(day).or_default().push(CalendarCard {
             id: row.0,
             title: row.1,
             done: row.2,
@@ -147,7 +150,7 @@ pub async fn get_calendar(
     }
 
     // Создаём дни календаря
-    let today = now.day() as u32;
+    let today = now.day();
     let current_month = now.month();
     let current_year = now.year();
 
@@ -183,22 +186,22 @@ pub async fn get_cards_for_day(
     State(pool): State<SqlitePool>,
 ) -> Result<Json<Vec<CalendarCard>>, (StatusCode, String)> {
     let start_timestamp = chrono::NaiveDate::from_ymd_opt(year, month, day)
-        .unwrap()
+        .expect("Некорректная дата начала дня")
         .and_hms_opt(0, 0, 0)
-        .unwrap()
+        .expect("Некорректное время 00:00:00")
         .and_utc()
         .timestamp();
 
     let end_timestamp = chrono::NaiveDate::from_ymd_opt(year, month, day)
-        .unwrap()
+        .expect("Некорректная дата конца дня")
         .and_hms_opt(23, 59, 59)
-        .unwrap()
+        .expect("Некорректное время 23:59:59")
         .and_utc()
         .timestamp();
 
     let now_timestamp = chrono::Utc::now().timestamp();
 
-    let cards: Vec<(i64, String, bool, i64, i64, String, i64, String)> = sqlx::query_as(
+    let cards: Vec<CardRow> = sqlx::query_as(
         r#"
         SELECT 
             c.id, c.title, c.done, c.due_date,
@@ -242,7 +245,7 @@ pub async fn get_cards_for_day(
 /// Получить количество дней в месяце
 fn get_days_in_month(year: i32, month: u32) -> u32 {
     use chrono::Datelike;
-    
+
     // Переходим к следующему месяцу и вычитаем день
     let (next_year, next_month) = if month == 12 {
         (year + 1, 1)
@@ -251,8 +254,8 @@ fn get_days_in_month(year: i32, month: u32) -> u32 {
     };
 
     chrono::NaiveDate::from_ymd_opt(next_year, next_month, 1)
-        .unwrap()
+        .expect("Некорректная дата первого дня следующего месяца")
         .pred_opt()
-        .unwrap()
+        .expect("Невозможно получить предыдущий день")
         .day()
 }

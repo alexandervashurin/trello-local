@@ -293,7 +293,7 @@ pub async fn add_card_assignee(
 ) -> Result<Json<()>, (StatusCode, String)> {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
+        .expect("Время не может идти вспять")
         .as_secs() as i64;
 
     let result = sqlx::query(
