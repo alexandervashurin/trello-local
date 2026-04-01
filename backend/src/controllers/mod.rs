@@ -10,3 +10,4 @@ pub mod export;
 pub mod checklists;
 pub mod search;
 pub mod calendar;
+pub mod card_history;

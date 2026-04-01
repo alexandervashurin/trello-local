@@ -94,6 +94,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/attachments/:attachment_id", get(controllers::attachments::download_attachment))
         // История активности
         .route("/boards/:board_id/activity", get(controllers::cards::get_activity_log))
+        // История изменений карточек
+        .route("/cards/:card_id/history", get(controllers::card_history::get_card_history))
         // Комментарии
         .route("/cards/:card_id/comments", get(controllers::comments::get_comments).post(controllers::comments::create_comment))
         .route("/comments/:id", patch(controllers::comments::update_comment).delete(controllers::comments::delete_comment))

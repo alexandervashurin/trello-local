@@ -129,3 +129,33 @@ pub struct UpdateChecklistItem {
 pub struct AddCardAssignee {
     pub user_id: i64,
 }
+
+/// Версия карточки (для истории изменений)
+#[derive(Serialize, FromRow, Clone, Debug)]
+pub struct CardVersion {
+    pub id: i64,
+    pub card_id: i64,
+    pub title: String,
+    pub content: Option<String>,
+    pub done: bool,
+    pub due_date: Option<i64>,
+    pub list_id: i64,
+    pub edited_by: i64,
+    pub edited_at: i64,
+    pub change_summary: String,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct CardVersionWithUser {
+    pub id: i64,
+    pub card_id: i64,
+    pub title: String,
+    pub content: Option<String>,
+    pub done: bool,
+    pub due_date: Option<i64>,
+    pub list_id: i64,
+    pub edited_by: i64,
+    pub edited_at: i64,
+    pub change_summary: String,
+    pub editor_username: String,
+}

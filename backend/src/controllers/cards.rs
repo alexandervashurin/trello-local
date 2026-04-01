@@ -1,10 +1,11 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Path, State, Extension},
     http::StatusCode,
     Json,
 };
 use sqlx::SqlitePool;
 use crate::models::{Card, CreateCard, UpdateCard, Label, CreateLabel, UpdateLabel, Attachment, ActivityLog};
+use crate::views::Claims;
 
 /// Вспомогательная функция для получения board_id по list_id
 async fn get_board_id_by_list_id(pool: &SqlitePool, list_id: i64) -> Option<i64> {
@@ -89,6 +90,7 @@ pub async fn create_card(
 pub async fn update_card(
     Path(id): Path<i64>,
     State(pool): State<SqlitePool>,
+    Extension(claims): Extension<Claims>,
     Json(payload): Json<UpdateCard>,
 ) -> Result<Json<Card>, (StatusCode, String)> {
     let current: Card = sqlx::query_as::<_, Card>(
@@ -156,6 +158,15 @@ pub async fn update_card(
             Some(id),
             &format!("Карточка \"{}\": {}", current.title, changes.join(", ")),
             None,
+        ).await;
+
+        // Сохраняем версию карточки
+        let change_summary = changes.join("; ");
+        let _ = crate::controllers::card_history::save_card_version(
+            &pool,
+            id,
+            claims.user_id,
+            &change_summary,
         ).await;
     }
 

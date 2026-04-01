@@ -69,6 +69,21 @@ pub async fn connect() -> Result<SqlitePool, Box<dyn std::error::Error>> {
             due_date INTEGER,
             FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE
         );
+        CREATE TABLE IF NOT EXISTS card_versions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            card_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            content TEXT,
+            done BOOLEAN NOT NULL DEFAULT 0,
+            due_date INTEGER,
+            list_id INTEGER NOT NULL,
+            edited_by INTEGER NOT NULL,
+            edited_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+            change_summary TEXT NOT NULL,
+            FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE,
+            FOREIGN KEY (edited_by) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_card_versions_card_id ON card_versions(card_id);
         CREATE TABLE IF NOT EXISTS comments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             card_id INTEGER NOT NULL,
