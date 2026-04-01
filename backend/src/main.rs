@@ -135,6 +135,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         // Логирование запросов
         .layer(TraceLayer::new_for_http())
+        // Security headers
+        .layer(axum::middleware::from_fn(middleware::security_headers::security_headers))
         .with_state(pool);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 8080));

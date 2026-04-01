@@ -37,8 +37,8 @@
 | ID | Задача | Описание | Файлы | Статус |
 |----|--------|----------|-------|--------|
 | 1.1 | Замена `.unwrap()` на `.expect()` | 18 `unwrap()` в контроллерах → `expect()` с сообщениями | `controllers/*.rs` | ✅ Completed |
-| 1.2 | Content Security Policy | Добавить CSP заголовки для XSS-защиты | `main.rs`, `middleware/` | ⏳ Pending |
-| 1.3 | Автоматизация cargo audit | CI/CD pipeline для проверки уязвимостей | `.github/workflows/` | ⏳ Pending |
+| 1.2 | Content Security Policy | Добавить CSP заголовки для XSS-защиты | `main.rs`, `middleware/` | ✅ Completed |
+| 1.3 | Автоматизация cargo audit | CI/CD pipeline для проверки уязвимостей | `.github/workflows/` | ✅ Completed |
 | 1.4 | Логирование событий безопасности | Аудит логинов, неудачных попыток входа | `controllers/auth.rs`, БД | ⏳ Pending |
 
 ### Приоритет 2: Функциональные улучшения (2-4 недели)
@@ -77,18 +77,19 @@
 ```
 backend/src/
 ├── controllers/
-│   ├── auth.rs          # Приоритет 1.1, 1.4
-│   ├── calendar.rs      # Приоритет 1.1 (10 unwrap)
-│   ├── export.rs        # Приоритет 1.1 (4 unwrap)
-│   ├── sessions.rs      # Приоритет 1.1 (3 unwrap)
-│   └── checklists.rs    # Приоритет 1.1 (1 unwrap)
+│   ├── auth.rs          # Приоритет 1.4
+│   ├── calendar.rs      # Готово ✅
+│   ├── export.rs        # Готово ✅
+│   ├── sessions.rs      # Готово ✅
+│   └── checklists.rs    # Готово ✅
 ├── middleware/
-│   ├── auth.rs          # Приоритет 1.2 (CSP)
-│   └── rate_limit.rs    # Готово ✅
-└── main.rs              # Приоритет 1.2 (CSP заголовки)
+│   ├── auth.rs          # Готово ✅
+│   ├── rate_limit.rs    # Готово ✅
+│   └── security_headers.rs  # Приоритет 1.2 ✅
+└── main.rs              # Приоритет 1.2 ✅
 
 .github/workflows/
-└── security-audit.yml   # Приоритет 1.3 (новый файл)
+└── rust.yml             # Приоритет 1.3 ✅
 
 frontend/
 ├── app.js               # Тёмная тема (2.5)
@@ -206,6 +207,7 @@ cargo fmt --check
 |------|-----------|-------|
 | 2026-04-01 | Первоначальное создание плана | — |
 | 2026-04-01 | Задача 1.1: Замена `.unwrap()` на `.expect()` (18 замен), исправление clippy warnings | ✅ Completed |
+| 2026-04-01 | Задачи 1.2, 1.3: CSP заголовки, CI/CD для cargo audit | ✅ Completed |
 
 ---
 
