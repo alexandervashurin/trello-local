@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-action@stable
+
+    - name: Build release binary
+      run: |
+        cd backend
+        cargo build --release
+        cp target/release/backend ../trello-local-server
+
+    - name: Create release archive
+      run: |
+        tar czf trello-local-${{ github.ref_name }}.tar.gz \
+          trello-local-server \
+          frontend/ \
+          docker-compose.yml \
+          Dockerfile \
+          README.md
+
+    - name: Generate changelog
+      id: changelog
+      run: |
+        PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+        if [ -n "$PREVIOUS_TAG" ]; then
+          CHANGELOG=$(git log --pretty=format:"- %s" $PREVIOUS_TAG..HEAD)
+        else
+          CHANGELOG=$(git log --pretty=format:"- %s" HEAD)
+        fi
+        echo "changelog<<EOF" >> $GITHUB_OUTPUT
+        echo "$CHANGELOG" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: trello-local-${{ github.ref_name }}.tar.gz
+        body: ${{ steps.changelog.outputs.changelog }}
+        draft: false
+        prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}

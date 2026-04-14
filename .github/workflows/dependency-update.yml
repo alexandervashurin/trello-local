@@ -1,0 +1,48 @@
+name: Update Advisory Database
+
+on:
+  schedule:
+    # Еженедельное обновление базы уязвимостей (каждый понедельник в 06:00 UTC)
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  update-db:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-action@stable
+
+    - name: Update Cargo.lock
+      working-directory: backend
+      run: cargo update
+
+    - name: Check for vulnerabilities
+      working-directory: backend
+      run: cargo audit
+
+    - name: Check for changes
+      id: diff
+      run: |
+        git diff --exit-code backend/Cargo.lock || echo "changed=true" >> $GITHUB_OUTPUT
+
+    - name: Create Pull Request
+      if: steps.diff.outputs.changed == 'true'
+      uses: peter-evans/create-pull-request@v6
+      with:
+        commit-message: "chore: обновить Cargo.lock"
+        title: "chore: обновить Cargo.lock"
+        body: |
+          Автоматическое обновление зависимостей через `cargo update`.
+
+          Проверьте cargo audit отчёт на наличие новых уязвимостей.
+        branch: auto-update-cargo-lock
+        delete-branch: true
+        base: main
+        labels: dependencies

@@ -1,0 +1,66 @@
+name: Frontend Check
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "frontend/**"
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "frontend/**"
+
+jobs:
+  html-validate:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Validate HTML
+      uses: Cyb3r-J/html-validation-action@v1
+      with:
+        files: |
+          frontend/index.html
+          frontend/login.html
+          frontend/invite.html
+
+  css-lint:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: "20"
+
+    - name: Install stylelint
+      run: npm install -g stylelint
+
+    - name: Lint CSS
+      run: |
+        if ls frontend/css/*.css 1> /dev/null 2>&1; then
+          stylelint "frontend/css/*.css" --config /dev/null || true
+        fi
+
+  js-lint:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: "20"
+
+    - name: Install ESLint
+      run: npm install -g eslint
+
+    - name: Lint JavaScript
+      run: |
+        if ls frontend/js/*.js 1> /dev/null 2>&1; then
+          eslint "frontend/js/*.js" --no-config-lookup || true
+        fi
