@@ -1,12 +1,12 @@
+use crate::models::{ChangePassword, CreateUser, UpdateProfile, User};
+use crate::views::Claims;
 use axum::{
-    extract::{Path, State, Query, Extension},
+    extract::{Extension, Path, Query, State},
     http::StatusCode,
     Json,
 };
-use sqlx::SqlitePool;
-use crate::models::{User, CreateUser, UpdateProfile, ChangePassword};
-use crate::views::Claims;
 use serde::Deserialize;
+use sqlx::SqlitePool;
 
 #[derive(Deserialize)]
 pub struct GetUserQuery {
@@ -173,22 +173,30 @@ pub async fn change_password(
             reason = "invalid_current_password",
             "Неудачная смена пароля: неверный текущий пароль"
         );
-        return Err((StatusCode::UNAUTHORIZED, "Неверный текущий пароль".to_string()));
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            "Неверный текущий пароль".to_string(),
+        ));
     }
 
     // Валидация нового пароля
     if payload.new_password.len() < 8 {
-        return Err((StatusCode::BAD_REQUEST, "Новый пароль должен быть не менее 8 символов".to_string()));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Новый пароль должен быть не менее 8 символов".to_string(),
+        ));
     }
-    
+
     // Проверка сложности нового пароля
     let has_upper = payload.new_password.chars().any(|c| c.is_uppercase());
     let has_lower = payload.new_password.chars().any(|c| c.is_lowercase());
     let has_digit = payload.new_password.chars().any(|c| c.is_numeric());
-    
+
     if !has_upper || !has_lower || !has_digit {
-        return Err((StatusCode::BAD_REQUEST, 
-            "Новый пароль должен содержать заглавные и строчные буквы, а также цифры".to_string()));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Новый пароль должен содержать заглавные и строчные буквы, а также цифры".to_string(),
+        ));
     }
 
     // Хэшируем и сохраняем новый пароль
@@ -231,8 +239,8 @@ pub async fn delete_account(
         (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
     })?;
 
-    let valid = bcrypt::verify(&payload.password, &user_with_password.password_hash)
-        .map_err(|e| {
+    let valid =
+        bcrypt::verify(&payload.password, &user_with_password.password_hash).map_err(|e| {
             tracing::error!(
                 target: "security",
                 user_id = claims.user_id,

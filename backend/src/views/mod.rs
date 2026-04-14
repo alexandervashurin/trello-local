@@ -1,5 +1,5 @@
-pub mod board_view;
 pub mod auth_view;
+pub mod board_view;
 
-pub use board_view::{BoardView, ListView, CardView, BoardMemberView, InvitationView};
 pub use auth_view::{AuthToken, Claims, ClaimsWith2FA, TwoFATempTokenResponse};
+pub use board_view::{BoardMemberView, BoardView, CardView, InvitationView, ListView};

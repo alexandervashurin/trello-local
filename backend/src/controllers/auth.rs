@@ -1,12 +1,10 @@
-use axum::{
-    extract::State,
-    http::StatusCode,
-    Json,
+use crate::models::{
+    LoginUser, RegisterUser, TwoFACode, TwoFAEnable, TwoFASetup, TwoFAStatus, User,
 };
+use crate::views::{AuthToken, Claims, ClaimsWith2FA};
+use axum::{extract::State, http::StatusCode, Json};
+use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use sqlx::SqlitePool;
-use crate::models::{RegisterUser, LoginUser, User, TwoFASetup, TwoFACode, TwoFAEnable, TwoFAStatus, TwoFATempToken};
-use crate::views::{AuthToken, Claims, ClaimsWith2FA, TwoFATempTokenResponse};
-use jsonwebtoken::{encode, Header, EncodingKey, Validation, Algorithm, DecodingKey, decode};
 use std::time::SystemTime;
 
 use crate::controllers::sessions;
@@ -15,7 +13,9 @@ use crate::controllers::sessions;
 fn get_jwt_secret() -> Vec<u8> {
     std::env::var("JWT_SECRET")
         .inspect_err(|_| {
-            tracing::warn!("JWT_SECRET не установлен! Используйте уникальное значение в production");
+            tracing::warn!(
+                "JWT_SECRET не установлен! Используйте уникальное значение в production"
+            );
         })
         .unwrap_or_else(|_| {
             use std::time::{SystemTime, UNIX_EPOCH};
@@ -29,11 +29,16 @@ fn get_jwt_secret() -> Vec<u8> {
 }
 
 /// Генерация JWT токена
-pub fn generate_token(user_id: i64, username: &str, two_factor_verified: bool) -> Result<String, (StatusCode, String)> {
+pub fn generate_token(
+    user_id: i64,
+    username: &str,
+    two_factor_verified: bool,
+) -> Result<String, (StatusCode, String)> {
     let expiration = SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("Время не может идти вспять")
-        .as_secs() + 60 * 60 * 24 * 7; // 7 дней
+        .as_secs()
+        + 60 * 60 * 24 * 7; // 7 дней
 
     let claims = ClaimsWith2FA {
         user_id,
@@ -44,8 +49,12 @@ pub fn generate_token(user_id: i64, username: &str, two_factor_verified: bool) -
         ip_address: None,
     };
 
-    encode(&Header::default(), &claims, &EncodingKey::from_secret(&get_jwt_secret()))
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+    encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(&get_jwt_secret()),
+    )
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
 /// Генерация временного токена для 2FA (короткое время жизни)
@@ -53,7 +62,8 @@ fn generate_temp_token(user_id: i64, username: &str) -> Result<String, (StatusCo
     let expiration = SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("Время не может идти вспять")
-        .as_secs() + 300; // 5 минут
+        .as_secs()
+        + 300; // 5 минут
 
     let claims = ClaimsWith2FA {
         user_id,
@@ -64,8 +74,12 @@ fn generate_temp_token(user_id: i64, username: &str) -> Result<String, (StatusCo
         ip_address: None,
     };
 
-    encode(&Header::default(), &claims, &EncodingKey::from_secret(&get_jwt_secret()))
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+    encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(&get_jwt_secret()),
+    )
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
 /// Регистрация нового пользователя
@@ -75,15 +89,24 @@ pub async fn register(
 ) -> Result<Json<AuthToken>, (StatusCode, String)> {
     // Валидация имени пользователя
     if payload.username.trim().len() < 3 {
-        return Err((StatusCode::BAD_REQUEST, "Имя пользователя должно быть не менее 3 символов".to_string()));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Имя пользователя должно быть не менее 3 символов".to_string(),
+        ));
     }
     if payload.username.len() > 50 {
-        return Err((StatusCode::BAD_REQUEST, "Имя пользователя слишком длинное".to_string()));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Имя пользователя слишком длинное".to_string(),
+        ));
     }
 
     // Валидация пароля
     if payload.password.len() < 8 {
-        return Err((StatusCode::BAD_REQUEST, "Пароль должен быть не менее 8 символов".to_string()));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Пароль должен быть не менее 8 символов".to_string(),
+        ));
     }
 
     // Проверка сложности пароля
@@ -92,8 +115,10 @@ pub async fn register(
     let has_digit = payload.password.chars().any(|c| c.is_numeric());
 
     if !has_upper || !has_lower || !has_digit {
-        return Err((StatusCode::BAD_REQUEST,
-            "Пароль должен содержать заглавные и строчные буквы, а также цифры".to_string()));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Пароль должен содержать заглавные и строчные буквы, а также цифры".to_string(),
+        ));
     }
 
     let password_hash = bcrypt::hash(&payload.password, 12)
@@ -157,8 +182,8 @@ pub async fn login(
         (StatusCode::UNAUTHORIZED, "Неверное имя пользователя или пароль".to_string())
     })?;
 
-    let valid = bcrypt::verify(&payload.password, &user_with_password.password_hash)
-        .map_err(|e| {
+    let valid =
+        bcrypt::verify(&payload.password, &user_with_password.password_hash).map_err(|e| {
             tracing::error!(
                 target: "security",
                 username = %payload.username,
@@ -179,7 +204,10 @@ pub async fn login(
             reason = "invalid_password",
             "Неудачная попытка входа: неверный пароль"
         );
-        return Err((StatusCode::UNAUTHORIZED, "Неверное имя пользователя или пароль".to_string()));
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            "Неверное имя пользователя или пароль".to_string(),
+        ));
     }
 
     // Обновляем last_login
@@ -199,11 +227,11 @@ pub async fn login(
 
     // Проверяем, включен ли 2FA
     let two_factor_enabled = user_with_password.two_factor_enabled.unwrap_or(false);
-    
+
     if two_factor_enabled {
         // Генерируем временный токен для прохождения 2FA
         let temp_token = generate_temp_token(user_with_password.id, &user_with_password.username)?;
-        
+
         return Ok(Json(serde_json::json!({
             "requires_2fa": true,
             "temp_token": temp_token,
@@ -242,7 +270,7 @@ pub async fn validate_token(
     let result = decode::<ClaimsWith2FA>(
         &token,
         &DecodingKey::from_secret(&get_jwt_secret()),
-        &Validation::new(Algorithm::HS256)
+        &Validation::new(Algorithm::HS256),
     );
 
     match result {
@@ -256,7 +284,7 @@ pub async fn validate_token(
             };
             Ok(Json(claims))
         }
-        Err(_) => Err((StatusCode::UNAUTHORIZED, "Неверный токен".to_string()))
+        Err(_) => Err((StatusCode::UNAUTHORIZED, "Неверный токен".to_string())),
     }
 }
 
@@ -268,7 +296,7 @@ pub async fn generate_2fa_setup(
     // Генерируем случайный секрет
     let secret_bytes: Vec<u8> = (0..32).map(|_| rand::random::<u8>()).collect();
     let secret_base32 = base32::encode(base32::Alphabet::Crockford, &secret_bytes);
-    
+
     // Создаем TOTP объект
     let totp = totp_rs::TOTP::new(
         totp_rs::Algorithm::SHA1,
@@ -278,26 +306,46 @@ pub async fn generate_2fa_setup(
         secret_bytes,
         Some("Trello Local".to_string()),
         "user@trello.local".to_string(),
-    ).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Ошибка создания TOTP: {}", e)))?;
-    
+    )
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Ошибка создания TOTP: {}", e),
+        )
+    })?;
+
     // Генерируем URI для Google Authenticator
     let uri = totp.get_url();
-    
+
     // Генерируем QR код в PNG format
     let qr_image = qrcode::QrCode::new(&uri)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Ошибка генерации QR: {}", e)))?
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Ошибка генерации QR: {}", e),
+            )
+        })?
         .render::<image::Luma<u8>>()
         .build();
-    
+
     // Конвертируем в base64
     let mut png_data = Vec::new();
     use std::io::Cursor;
-    qr_image.write_to(&mut Cursor::new(&mut png_data), image::ImageFormat::Png)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Ошибка создания PNG: {}", e)))?;
-    
+    qr_image
+        .write_to(&mut Cursor::new(&mut png_data), image::ImageFormat::Png)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Ошибка создания PNG: {}", e),
+            )
+        })?;
+
     use base64::Engine;
-    let qr_string = format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(&png_data));
-    
+    let qr_string = format!(
+        "data:image/png;base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(&png_data)
+    );
+
     Ok(Json(TwoFASetup {
         secret: secret_base32,
         uri,
@@ -324,11 +372,20 @@ pub async fn enable_2fa(
 
     if payload.enable {
         // Проверяем TOTP код перед включением
-        let secret = user.two_factor_secret
-            .ok_or_else(|| (StatusCode::BAD_REQUEST, "2FA секрет не установлен".to_string()))?;
+        let secret = user.two_factor_secret.ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                "2FA секрет не установлен".to_string(),
+            )
+        })?;
 
-        let secret_bytes = base32::decode(base32::Alphabet::Crockford, &secret)
-            .ok_or_else(|| (StatusCode::INTERNAL_SERVER_ERROR, "Ошибка декодирования секрета".to_string()))?;
+        let secret_bytes =
+            base32::decode(base32::Alphabet::Crockford, &secret).ok_or_else(|| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Ошибка декодирования секрета".to_string(),
+                )
+            })?;
 
         let totp = totp_rs::TOTP::new(
             totp_rs::Algorithm::SHA1,
@@ -338,10 +395,20 @@ pub async fn enable_2fa(
             secret_bytes,
             Some("Trello Local".to_string()),
             user.username.clone(),
-        ).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Ошибка создания TOTP: {}", e)))?;
+        )
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Ошибка создания TOTP: {}", e),
+            )
+        })?;
 
-        let valid = totp.check_current(&payload.code)
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Ошибка проверки TOTP: {}", e)))?;
+        let valid = totp.check_current(&payload.code).map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Ошибка проверки TOTP: {}", e),
+            )
+        })?;
 
         if !valid {
             tracing::warn!(
@@ -371,19 +438,21 @@ pub async fn enable_2fa(
         Ok(Json(TwoFAStatus { enabled: true }))
     } else {
         // Выключаем 2FA
-        sqlx::query("UPDATE users SET two_factor_enabled = 0, two_factor_secret = NULL WHERE id = ?")
-            .bind(user_id)
-            .execute(&pool)
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-        
+        sqlx::query(
+            "UPDATE users SET two_factor_enabled = 0, two_factor_secret = NULL WHERE id = ?",
+        )
+        .bind(user_id)
+        .execute(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
         tracing::info!(
             target: "security",
             user_id = user_id,
             event = "2fa_disabled",
             "2FA выключен для пользователя"
         );
-        
+
         Ok(Json(TwoFAStatus { enabled: false }))
     }
 }
@@ -404,12 +473,17 @@ pub async fn verify_2fa(
     .await
     .map_err(|_| (StatusCode::NOT_FOUND, "Пользователь не найден".to_string()))?;
 
-    let secret = user.two_factor_secret
+    let secret = user
+        .two_factor_secret
         .ok_or_else(|| (StatusCode::BAD_REQUEST, "2FA не настроен".to_string()))?;
 
     // Проверяем TOTP код
-    let secret_bytes = base32::decode(base32::Alphabet::Crockford, &secret)
-        .ok_or_else(|| (StatusCode::INTERNAL_SERVER_ERROR, "Ошибка декодирования секрета".to_string()))?;
+    let secret_bytes = base32::decode(base32::Alphabet::Crockford, &secret).ok_or_else(|| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Ошибка декодирования секрета".to_string(),
+        )
+    })?;
 
     let totp = totp_rs::TOTP::new(
         totp_rs::Algorithm::SHA1,
@@ -419,10 +493,20 @@ pub async fn verify_2fa(
         secret_bytes,
         Some("Trello Local".to_string()),
         user.username.clone(),
-    ).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Ошибка создания TOTP: {}", e)))?;
+    )
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Ошибка создания TOTP: {}", e),
+        )
+    })?;
 
-    let valid = totp.check_current(&payload.code)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Ошибка проверки TOTP: {}", e)))?;
+    let valid = totp.check_current(&payload.code).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Ошибка проверки TOTP: {}", e),
+        )
+    })?;
 
     if !valid {
         tracing::warn!(
@@ -439,14 +523,14 @@ pub async fn verify_2fa(
 
     // Сохраняем сессию
     let _ = sessions::save_session(&pool, user.id, &token, None, None).await;
-    
+
     tracing::info!(
         target: "security",
         user_id = user.id,
         event = "2fa_verification_success",
         "Успешная проверка 2FA"
     );
-    
+
     Ok(Json(AuthToken {
         token,
         user_id: user.id,

@@ -1,12 +1,12 @@
+use crate::models::{CreateNotification, Notification};
+use crate::views::Claims;
 use axum::{
-    extract::{Path, State, Extension, Query},
+    extract::{Extension, Path, Query, State},
     http::StatusCode,
     Json,
 };
-use sqlx::SqlitePool;
-use crate::models::{Notification, NotificationWithCreator, CreateNotification, UpdateNotificationRead};
-use crate::views::Claims;
 use serde::Deserialize;
+use sqlx::SqlitePool;
 
 /// Параметры запроса уведомлений
 #[derive(Deserialize)]
@@ -22,7 +22,7 @@ pub async fn get_notifications(
     Query(query): Query<NotificationQuery>,
 ) -> Result<Json<Vec<Notification>>, (StatusCode, String)> {
     let limit = query.limit.unwrap_or(50);
-    
+
     let notifications: Vec<Notification> = if query.unread_only.unwrap_or(false) {
         sqlx::query_as(
             "SELECT id, user_id, title, message, notification_type, is_read, created_at, link FROM notifications WHERE user_id = ? AND is_read = 0 ORDER BY created_at DESC LIMIT ?",
@@ -52,8 +52,10 @@ pub async fn create_notification(
     Extension(claims): Extension<Claims>,
     Json(payload): Json<CreateNotification>,
 ) -> Result<Json<Notification>, (StatusCode, String)> {
-    let notification_type = payload.notification_type.unwrap_or_else(|| "info".to_string());
-    
+    let notification_type = payload
+        .notification_type
+        .unwrap_or_else(|| "info".to_string());
+
     let notification: Notification = sqlx::query_as(
         "INSERT INTO notifications (user_id, title, message, notification_type, link) VALUES (?, ?, ?, ?, ?) RETURNING *",
     )
@@ -75,14 +77,12 @@ pub async fn mark_notification_read(
     State(pool): State<SqlitePool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<()>, (StatusCode, String)> {
-    let result = sqlx::query(
-        "UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?",
-    )
-    .bind(notification_id)
-    .bind(claims.user_id)
-    .execute(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let result = sqlx::query("UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?")
+        .bind(notification_id)
+        .bind(claims.user_id)
+        .execute(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     if result.rows_affected() == 0 {
         Err((StatusCode::NOT_FOUND, "Уведомление не найдено".to_string()))
@@ -96,13 +96,11 @@ pub async fn mark_all_read(
     State(pool): State<SqlitePool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<()>, (StatusCode, String)> {
-    sqlx::query(
-        "UPDATE notifications SET is_read = 1 WHERE user_id = ?",
-    )
-    .bind(claims.user_id)
-    .execute(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    sqlx::query("UPDATE notifications SET is_read = 1 WHERE user_id = ?")
+        .bind(claims.user_id)
+        .execute(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     Ok(Json(()))
 }
@@ -113,14 +111,12 @@ pub async fn delete_notification(
     State(pool): State<SqlitePool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<()>, (StatusCode, String)> {
-    let result = sqlx::query(
-        "DELETE FROM notifications WHERE id = ? AND user_id = ?",
-    )
-    .bind(notification_id)
-    .bind(claims.user_id)
-    .execute(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let result = sqlx::query("DELETE FROM notifications WHERE id = ? AND user_id = ?")
+        .bind(notification_id)
+        .bind(claims.user_id)
+        .execute(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     if result.rows_affected() == 0 {
         Err((StatusCode::NOT_FOUND, "Уведомление не найдено".to_string()))
@@ -134,13 +130,12 @@ pub async fn get_unread_count(
     State(pool): State<SqlitePool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<i64>, (StatusCode, String)> {
-    let count: (i64,) = sqlx::query_as(
-        "SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0",
-    )
-    .bind(claims.user_id)
-    .fetch_one(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let count: (i64,) =
+        sqlx::query_as("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0")
+            .bind(claims.user_id)
+            .fetch_one(&pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     Ok(Json(count.0))
 }

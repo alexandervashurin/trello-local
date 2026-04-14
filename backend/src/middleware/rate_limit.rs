@@ -21,7 +21,7 @@ pub struct RateLimiterConfig {
 impl Default for RateLimiterConfig {
     fn default() -> Self {
         Self {
-            max_requests: 100, // 100 запросов
+            max_requests: 100,                        // 100 запросов
             window_duration: Duration::from_secs(60), // в минуту
         }
     }
@@ -31,7 +31,7 @@ impl Default for RateLimiterConfig {
 impl RateLimiterConfig {
     pub fn for_auth() -> Self {
         Self {
-            max_requests: 5, // 5 попыток
+            max_requests: 5,                          // 5 попыток
             window_duration: Duration::from_secs(60), // в минуту
         }
     }

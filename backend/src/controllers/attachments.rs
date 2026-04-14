@@ -1,12 +1,12 @@
+use crate::models::Attachment;
 use axum::{
     extract::{Multipart, Path, State},
     http::StatusCode,
     Json,
 };
-use sqlx::SqlitePool;
-use crate::models::Attachment;
-use std::path::PathBuf;
 use chrono::Utc;
+use sqlx::SqlitePool;
+use std::path::PathBuf;
 
 /// Максимальный размер загружаемого файла (10 MB)
 const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024;
@@ -48,14 +48,18 @@ pub async fn upload_attachment(
         .map_err(|e| (StatusCode::BAD_REQUEST, format!("Ошибка multipart: {}", e)))?
         .ok_or((StatusCode::BAD_REQUEST, "Файл не найден".to_string()))?;
 
-    let filename = field
-        .file_name()
-        .unwrap_or("unnamed")
-        .to_string();
+    let filename = field.file_name().unwrap_or("unnamed").to_string();
 
     // Валидация имени файла
-    if filename.is_empty() || filename.contains("..") || filename.contains('/') || filename.contains('\\') {
-        return Err((StatusCode::BAD_REQUEST, "Недопустимое имя файла".to_string()));
+    if filename.is_empty()
+        || filename.contains("..")
+        || filename.contains('/')
+        || filename.contains('\\')
+    {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Недопустимое имя файла".to_string(),
+        ));
     }
 
     // Получаем mime_type до вызова bytes()
@@ -64,10 +68,13 @@ pub async fn upload_attachment(
     // Валидация MIME-типа
     if let Some(ref mt) = mime_type {
         if !ALLOWED_MIME_TYPES.contains(&mt.as_str()) {
-            return Err((StatusCode::BAD_REQUEST, format!(
-                "Недопустимый тип файла. Разрешены: {}",
-                ALLOWED_MIME_TYPES.join(", ")
-            )));
+            return Err((
+                StatusCode::BAD_REQUEST,
+                format!(
+                    "Недопустимый тип файла. Разрешены: {}",
+                    ALLOWED_MIME_TYPES.join(", ")
+                ),
+            ));
         }
     }
 
@@ -76,18 +83,23 @@ pub async fn upload_attachment(
     let safe_filename = format!("{}_{}", timestamp, filename.replace(" ", "_"));
     let file_path = attachments_dir.join(&safe_filename);
 
-    let data = field
-        .bytes()
-        .await
-        .map_err(|e| (StatusCode::BAD_REQUEST, format!("Ошибка чтения файла: {}", e)))?;
+    let data = field.bytes().await.map_err(|e| {
+        (
+            StatusCode::BAD_REQUEST,
+            format!("Ошибка чтения файла: {}", e),
+        )
+    })?;
 
     // Валидация размера файла
     let file_size = data.len() as u64;
     if file_size > MAX_FILE_SIZE {
-        return Err((StatusCode::BAD_REQUEST, format!(
-            "Файл слишком большой. Максимальный размер: {} MB",
-            MAX_FILE_SIZE / 1024 / 1024
-        )));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!(
+                "Файл слишком большой. Максимальный размер: {} MB",
+                MAX_FILE_SIZE / 1024 / 1024
+            ),
+        ));
     }
 
     if file_size == 0 {
@@ -95,8 +107,12 @@ pub async fn upload_attachment(
     }
 
     // Сохраняем файл
-    std::fs::write(&file_path, &data)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Ошибка сохранения файла: {}", e)))?;
+    std::fs::write(&file_path, &data).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Ошибка сохранения файла: {}", e),
+        )
+    })?;
 
     // Сохраняем запись в БД
     let attachment: Attachment = sqlx::query_as::<_, Attachment>(
@@ -128,18 +144,33 @@ pub async fn download_attachment(
     .await
     .map_err(|_e| (StatusCode::NOT_FOUND, "Вложение не найдено".to_string()))?;
 
-    let file_data = std::fs::read(&attachment.file_path)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Ошибка чтения файла: {}", e)))?;
+    let file_data = std::fs::read(&attachment.file_path).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Ошибка чтения файла: {}", e),
+        )
+    })?;
 
-    let mime_type = attachment.mime_type.as_deref().unwrap_or("application/octet-stream");
-    
+    let mime_type = attachment
+        .mime_type
+        .as_deref()
+        .unwrap_or("application/octet-stream");
+
     let response = axum::response::Response::builder()
         .status(StatusCode::OK)
         .header("Content-Type", mime_type)
-        .header("Content-Disposition", format!("attachment; filename=\"{}\"", attachment.filename))
+        .header(
+            "Content-Disposition",
+            format!("attachment; filename=\"{}\"", attachment.filename),
+        )
         .header("Content-Length", attachment.file_size.to_string())
         .body(axum::body::Body::from(file_data))
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Ошибка создания ответа: {}", e)))?;
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Ошибка создания ответа: {}", e),
+            )
+        })?;
 
     Ok(response)
 }

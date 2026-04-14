@@ -1,5 +1,5 @@
+use crate::models::{Attachment, Board, BoardMember, Card, Label, List};
 use serde::Serialize;
-use crate::models::{Board, List, Card, Label, Attachment, BoardMember};
 
 #[derive(Serialize, Default)]
 pub struct BoardView {
@@ -42,11 +42,14 @@ impl BoardView {
     }
 
     pub fn with_members(mut self, members: Vec<BoardMember>) -> Self {
-        self.members = members.into_iter().map(|m| BoardMemberView {
-            user_id: m.user_id,
-            username: m.username,
-            role: m.role,
-        }).collect();
+        self.members = members
+            .into_iter()
+            .map(|m| BoardMemberView {
+                user_id: m.user_id,
+                username: m.username,
+                role: m.role,
+            })
+            .collect();
         self
     }
 

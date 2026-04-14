@@ -1,12 +1,15 @@
+use crate::controllers::cards::{get_board_id_by_card_id, log_activity};
+use crate::models::{
+    AddCardAssignee, CardAssigneeWithUser, Checklist, ChecklistItem, CreateChecklist,
+    CreateChecklistItem, UpdateChecklistItem,
+};
+use crate::views::Claims;
 use axum::{
-    extract::{Path, State, Extension},
+    extract::{Extension, Path, State},
     http::StatusCode,
     Json,
 };
 use sqlx::SqlitePool;
-use crate::models::{Checklist, ChecklistItem, CardAssigneeWithUser, CreateChecklist, CreateChecklistItem, UpdateChecklistItem, AddCardAssignee};
-use crate::views::Claims;
-use crate::controllers::cards::{get_board_id_by_card_id, log_activity};
 
 // === Checklist Functions ===
 
@@ -74,7 +77,8 @@ pub async fn create_checklist(
             Some(checklist.id),
             &format!("Добавлен чек-лист \"{}\"", &payload.title),
             None,
-        ).await;
+        )
+        .await;
     }
 
     Ok(Json(checklist))
@@ -86,16 +90,17 @@ pub async fn delete_checklist(
     State(pool): State<SqlitePool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<()>, (StatusCode, String)> {
-    let checklist_title: Option<(String,)> = sqlx::query_as(
-        "SELECT title FROM checklists WHERE id = ? AND card_id = ?",
-    )
-    .bind(checklist_id)
-    .bind(card_id)
-    .fetch_optional(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let checklist_title: Option<(String,)> =
+        sqlx::query_as("SELECT title FROM checklists WHERE id = ? AND card_id = ?")
+            .bind(checklist_id)
+            .bind(card_id)
+            .fetch_optional(&pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let title = checklist_title.map(|t| t.0).unwrap_or_else(|| "неизвестно".to_string());
+    let title = checklist_title
+        .map(|t| t.0)
+        .unwrap_or_else(|| "неизвестно".to_string());
 
     let result = sqlx::query("DELETE FROM checklists WHERE id = ? AND card_id = ?")
         .bind(checklist_id)
@@ -118,7 +123,8 @@ pub async fn delete_checklist(
                 Some(checklist_id),
                 &format!("Удалён чек-лист \"{}\"", title),
                 None,
-            ).await;
+            )
+            .await;
         }
         Ok(Json(()))
     }
@@ -152,7 +158,8 @@ pub async fn create_checklist_item(
             Some(item.id),
             &format!("Добавлен элемент \"{}\" в чек-лист", &payload.title),
             None,
-        ).await;
+        )
+        .await;
     }
 
     Ok(Json(item))
@@ -195,7 +202,11 @@ pub async fn update_checklist_item(
             changes.push(format!("название → \"{}\"", new_title));
         }
         if payload.done.is_some() && payload.done != Some(current.done) {
-            changes.push(if new_done { "отмечен выполненным".to_string() } else { "возвращён в работу".to_string() });
+            changes.push(if new_done {
+                "отмечен выполненным".to_string()
+            } else {
+                "возвращён в работу".to_string()
+            });
         }
         if !changes.is_empty() {
             let _ = log_activity(
@@ -205,9 +216,14 @@ pub async fn update_checklist_item(
                 "update",
                 Some("checklist_item"),
                 Some(item_id),
-                &format!("Элемент чек-листа \"{}\": {}", current_title, changes.join(", ")),
+                &format!(
+                    "Элемент чек-листа \"{}\": {}",
+                    current_title,
+                    changes.join(", ")
+                ),
                 None,
-            ).await;
+            )
+            .await;
         }
     }
 
@@ -220,16 +236,17 @@ pub async fn delete_checklist_item(
     State(pool): State<SqlitePool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<()>, (StatusCode, String)> {
-    let item_title: Option<(String,)> = sqlx::query_as(
-        "SELECT title FROM checklist_items WHERE id = ? AND checklist_id = ?",
-    )
-    .bind(item_id)
-    .bind(checklist_id)
-    .fetch_optional(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let item_title: Option<(String,)> =
+        sqlx::query_as("SELECT title FROM checklist_items WHERE id = ? AND checklist_id = ?")
+            .bind(item_id)
+            .bind(checklist_id)
+            .fetch_optional(&pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let title = item_title.map(|t| t.0).unwrap_or_else(|| "неизвестно".to_string());
+    let title = item_title
+        .map(|t| t.0)
+        .unwrap_or_else(|| "неизвестно".to_string());
 
     let result = sqlx::query("DELETE FROM checklist_items WHERE id = ? AND checklist_id = ?")
         .bind(item_id)
@@ -239,7 +256,10 @@ pub async fn delete_checklist_item(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     if result.rows_affected() == 0 {
-        Err((StatusCode::NOT_FOUND, "Элемент чек-листа не найден".to_string()))
+        Err((
+            StatusCode::NOT_FOUND,
+            "Элемент чек-листа не найден".to_string(),
+        ))
     } else {
         // Логирование
         if let Some(board_id) = get_board_id_by_card_id(&pool, card_id).await {
@@ -252,7 +272,8 @@ pub async fn delete_checklist_item(
                 Some(item_id),
                 &format!("Удалён элемент чек-листа \"{}\"", title),
                 None,
-            ).await;
+            )
+            .await;
         }
         Ok(Json(()))
     }
@@ -273,13 +294,16 @@ pub async fn get_card_assignees(
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let assignees = rows.into_iter().map(|r| CardAssigneeWithUser {
-        card_id: r.0,
-        user_id: r.1,
-        assigned_at: r.2,
-        assigned_by: r.3,
-        username: r.4,
-    }).collect();
+    let assignees = rows
+        .into_iter()
+        .map(|r| CardAssigneeWithUser {
+            card_id: r.0,
+            user_id: r.1,
+            assigned_at: r.2,
+            assigned_by: r.3,
+            username: r.4,
+        })
+        .collect();
 
     Ok(Json(assignees))
 }
@@ -308,20 +332,24 @@ pub async fn add_card_assignee(
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     if result.rows_affected() == 0 {
-        Err((StatusCode::NOT_FOUND, "Карточка или пользователь не найдены".to_string()))
+        Err((
+            StatusCode::NOT_FOUND,
+            "Карточка или пользователь не найдены".to_string(),
+        ))
     } else {
         // Логирование
         if let Some(board_id) = get_board_id_by_card_id(&pool, card_id).await {
-            let username: Option<(String,)> = sqlx::query_as(
-                "SELECT username FROM users WHERE id = ?",
-            )
-            .bind(payload.user_id)
-            .fetch_optional(&pool)
-            .await
-            .ok()
-            .flatten();
+            let username: Option<(String,)> =
+                sqlx::query_as("SELECT username FROM users WHERE id = ?")
+                    .bind(payload.user_id)
+                    .fetch_optional(&pool)
+                    .await
+                    .ok()
+                    .flatten();
 
-            let user_display = username.map(|u| u.0).unwrap_or_else(|| format!("user_{}", payload.user_id));
+            let user_display = username
+                .map(|u| u.0)
+                .unwrap_or_else(|| format!("user_{}", payload.user_id));
 
             let _ = log_activity(
                 &pool,
@@ -332,7 +360,8 @@ pub async fn add_card_assignee(
                 Some(payload.user_id),
                 &format!("Назначен исполнитель \"{}\"", user_display),
                 None,
-            ).await;
+            )
+            .await;
         }
         Ok(Json(()))
     }
@@ -365,7 +394,8 @@ pub async fn remove_card_assignee(
                 Some(user_id),
                 &format!("Удалён исполнитель (user_id: {})", user_id),
                 None,
-            ).await;
+            )
+            .await;
         }
         Ok(Json(()))
     }

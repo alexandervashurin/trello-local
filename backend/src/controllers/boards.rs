@@ -1,15 +1,17 @@
+use crate::models::{
+    AddBoardMember, Board, BoardInvitation, BoardMember, CreateBoard, CreateInvitation, UpdateBoard,
+};
+use crate::models::{Attachment, Card, Label, List};
+use crate::views::{BoardView, CardView, Claims, InvitationView, ListView};
+use axum::extract::Extension;
 use axum::{
-    extract::{Path, State, Query},
+    extract::{Path, Query, State},
     http::StatusCode,
     Json,
 };
 use axum_macros::debug_handler;
-use sqlx::SqlitePool;
-use crate::models::{Board, CreateBoard, UpdateBoard, AddBoardMember, BoardMember, BoardInvitation, CreateInvitation};
-use crate::views::{BoardView, ListView, CardView, InvitationView, Claims};
-use crate::models::{List, Card, Label, Attachment};
 use serde::Deserialize;
-use axum::extract::Extension;
+use sqlx::SqlitePool;
 
 /// Получить базовый URL сервера из переменной окружения или использовать localhost
 fn get_server_url() -> String {
@@ -30,7 +32,7 @@ pub async fn get_boards(
 ) -> Result<Json<Vec<BoardView>>, (StatusCode, String)> {
     // Получаем текущего пользователя из токена
     let current_user_id = claims.map(|c| c.user_id);
-    
+
     let boards: Vec<Board> = if let Some(search) = &query.search {
         sqlx::query_as("SELECT * FROM boards WHERE title LIKE ? ORDER BY id")
             .bind(format!("%{}%", search))
@@ -50,18 +52,21 @@ pub async fn get_boards(
             "public" => true,
             "private" => {
                 if let Some(user_id) = current_user_id {
-                    user_id == board.owner_id || is_board_member(&pool, board.id, user_id).await.unwrap_or(false)
+                    user_id == board.owner_id
+                        || is_board_member(&pool, board.id, user_id)
+                            .await
+                            .unwrap_or(false)
                 } else {
                     false
                 }
             }
             _ => false,
         };
-        
+
         if !can_view {
             continue;
         }
-        
+
         let board_view = load_board_details(&pool, board).await?;
         result.push(board_view);
     }
@@ -74,13 +79,12 @@ pub async fn get_boards_for_user(
     Path(user_id): Path<i64>,
     State(pool): State<SqlitePool>,
 ) -> Result<Json<Vec<BoardView>>, (StatusCode, String)> {
-    let boards: Vec<Board> = sqlx::query_as(
-        "SELECT * FROM boards WHERE owner_id = ? OR is_shared = 1 ORDER BY id",
-    )
-    .bind(user_id)
-    .fetch_all(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let boards: Vec<Board> =
+        sqlx::query_as("SELECT * FROM boards WHERE owner_id = ? OR is_shared = 1 ORDER BY id")
+            .bind(user_id)
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let mut result = Vec::new();
     for board in boards {
@@ -100,10 +104,16 @@ pub async fn create_board(
 ) -> Result<Json<Board>, (StatusCode, String)> {
     // Валидация названия
     if payload.title.trim().is_empty() {
-        return Err((StatusCode::BAD_REQUEST, "Название не может быть пустым".to_string()));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Название не может быть пустым".to_string(),
+        ));
     }
     if payload.title.len() > 200 {
-        return Err((StatusCode::BAD_REQUEST, "Название слишком длинное".to_string()));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Название слишком длинное".to_string(),
+        ));
     }
 
     let owner_id = claims.map(|c| c.user_id).unwrap_or(1); // Default to 1 for tests
@@ -139,7 +149,8 @@ pub async fn create_board(
         Some(board.id),
         &format!("Создана доска \"{}\"", &payload.title),
         None,
-    ).await;
+    )
+    .await;
 
     Ok(Json(board))
 }
@@ -152,21 +163,23 @@ pub async fn update_board(
     Extension(claims): Extension<Claims>,
     Json(payload): Json<UpdateBoard>,
 ) -> Result<Json<Board>, (StatusCode, String)> {
-    
     // Проверка прав на редактирование
-    let board: Board = sqlx::query_as::<_, Board>(
-        "SELECT * FROM boards WHERE id = ?"
-    )
-    .bind(id)
-    .fetch_one(&pool)
-    .await
-    .map_err(|_e| (StatusCode::NOT_FOUND, "Доска не найдена".to_string()))?;
-    
-    let has_permission = claims.user_id == board.owner_id 
-        || has_role(&pool, id, claims.user_id, &["owner", "admin", "editor"]).await.unwrap_or(false);
-    
+    let board: Board = sqlx::query_as::<_, Board>("SELECT * FROM boards WHERE id = ?")
+        .bind(id)
+        .fetch_one(&pool)
+        .await
+        .map_err(|_e| (StatusCode::NOT_FOUND, "Доска не найдена".to_string()))?;
+
+    let has_permission = claims.user_id == board.owner_id
+        || has_role(&pool, id, claims.user_id, &["owner", "admin", "editor"])
+            .await
+            .unwrap_or(false);
+
     if !has_permission {
-        return Err((StatusCode::FORBIDDEN, "Нет прав на редактирование доски".to_string()));
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Нет прав на редактирование доски".to_string(),
+        ));
     }
 
     let board: Board = sqlx::query_as::<_, Board>(
@@ -189,13 +202,26 @@ pub async fn update_board(
     // Логирование изменений
     let mut changes = Vec::new();
     if payload.title.is_some() {
-        changes.push(format!("название → \"{}\"", payload.title.as_ref().unwrap_or(&board.title)));
+        changes.push(format!(
+            "название → \"{}\"",
+            payload.title.as_ref().unwrap_or(&board.title)
+        ));
     }
     if payload.is_shared.is_some() {
-        changes.push(format!("общий доступ → {}", if payload.is_shared.expect("is_shared должен быть установлен") { "включён" } else { "выключен" }));
+        changes.push(format!(
+            "общий доступ → {}",
+            if payload.is_shared.expect("is_shared должен быть установлен") {
+                "включён"
+            } else {
+                "выключен"
+            }
+        ));
     }
     if payload.visibility.is_some() {
-        changes.push(format!("видимость → {}", payload.visibility.as_ref().unwrap_or(&board.visibility)));
+        changes.push(format!(
+            "видимость → {}",
+            payload.visibility.as_ref().unwrap_or(&board.visibility)
+        ));
     }
     if !changes.is_empty() {
         let _ = crate::controllers::cards::log_activity(
@@ -207,7 +233,8 @@ pub async fn update_board(
             Some(id),
             &format!("Доска \"{}\": {}", board.title, changes.join(", ")),
             None,
-        ).await;
+        )
+        .await;
     }
 
     Ok(Json(board))
@@ -219,15 +246,15 @@ pub async fn delete_board(
     State(pool): State<SqlitePool>,
 ) -> Result<Json<()>, (StatusCode, String)> {
     // Получаем название доски перед удалением
-    let board_title: Option<(String,)> = sqlx::query_as(
-        "SELECT title FROM boards WHERE id = ?"
-    )
-    .bind(id)
-    .fetch_optional(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let board_title: Option<(String,)> = sqlx::query_as("SELECT title FROM boards WHERE id = ?")
+        .bind(id)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let title = board_title.map(|t| t.0).unwrap_or_else(|| "неизвестно".to_string());
+    let title = board_title
+        .map(|t| t.0)
+        .unwrap_or_else(|| "неизвестно".to_string());
 
     let result = sqlx::query("DELETE FROM boards WHERE id = ?")
         .bind(id)
@@ -248,7 +275,8 @@ pub async fn delete_board(
             Some(id),
             &format!("Удалена доска \"{}\"", title),
             None,
-        ).await;
+        )
+        .await;
         Ok(Json(()))
     }
 }
@@ -277,23 +305,25 @@ pub async fn add_board_member(
     Extension(claims): Extension<Claims>,
     Json(payload): Json<AddBoardMember>,
 ) -> Result<Json<()>, (StatusCode, String)> {
-    
     // Проверка прав: только owner, admin могут добавлять участников
-    let board: Board = sqlx::query_as::<_, Board>(
-        "SELECT * FROM boards WHERE id = ?"
-    )
-    .bind(board_id)
-    .fetch_one(&pool)
-    .await
-    .map_err(|_e| (StatusCode::NOT_FOUND, "Доска не найдена".to_string()))?;
-    
-    let has_permission = claims.user_id == board.owner_id 
-        || has_role(&pool, board_id, claims.user_id, &["owner", "admin"]).await.unwrap_or(false);
-    
+    let board: Board = sqlx::query_as::<_, Board>("SELECT * FROM boards WHERE id = ?")
+        .bind(board_id)
+        .fetch_one(&pool)
+        .await
+        .map_err(|_e| (StatusCode::NOT_FOUND, "Доска не найдена".to_string()))?;
+
+    let has_permission = claims.user_id == board.owner_id
+        || has_role(&pool, board_id, claims.user_id, &["owner", "admin"])
+            .await
+            .unwrap_or(false);
+
     if !has_permission {
-        return Err((StatusCode::FORBIDDEN, "Нет прав на добавление участников".to_string()));
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Нет прав на добавление участников".to_string(),
+        ));
     }
-    
+
     let result = sqlx::query(
         "INSERT OR REPLACE INTO board_members (board_id, user_id, role) VALUES (?, ?, ?)",
     )
@@ -305,7 +335,10 @@ pub async fn add_board_member(
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     if result.rows_affected() == 0 {
-        Err((StatusCode::NOT_FOUND, "Доска или пользователь не найдены".to_string()))
+        Err((
+            StatusCode::NOT_FOUND,
+            "Доска или пользователь не найдены".to_string(),
+        ))
     } else {
         Ok(Json(()))
     }
@@ -318,23 +351,25 @@ pub async fn remove_board_member(
     State(pool): State<SqlitePool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<()>, (StatusCode, String)> {
-    
     // Проверка прав: только owner, admin могут удалять участников
-    let board: Board = sqlx::query_as::<_, Board>(
-        "SELECT * FROM boards WHERE id = ?"
-    )
-    .bind(board_id)
-    .fetch_one(&pool)
-    .await
-    .map_err(|_e| (StatusCode::NOT_FOUND, "Доска не найдена".to_string()))?;
-    
-    let has_permission = claims.user_id == board.owner_id 
-        || has_role(&pool, board_id, claims.user_id, &["owner", "admin"]).await.unwrap_or(false);
-    
+    let board: Board = sqlx::query_as::<_, Board>("SELECT * FROM boards WHERE id = ?")
+        .bind(board_id)
+        .fetch_one(&pool)
+        .await
+        .map_err(|_e| (StatusCode::NOT_FOUND, "Доска не найдена".to_string()))?;
+
+    let has_permission = claims.user_id == board.owner_id
+        || has_role(&pool, board_id, claims.user_id, &["owner", "admin"])
+            .await
+            .unwrap_or(false);
+
     if !has_permission {
-        return Err((StatusCode::FORBIDDEN, "Нет прав на удаление участников".to_string()));
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Нет прав на удаление участников".to_string(),
+        ));
     }
-    
+
     let result = sqlx::query("DELETE FROM board_members WHERE board_id = ? AND user_id = ?")
         .bind(board_id)
         .bind(user_id)
@@ -386,13 +421,12 @@ async fn load_board_details(
         // Для каждой карточки загружаем метки и вложения
         let mut card_views = Vec::new();
         for card in cards {
-            let labels: Vec<Label> = sqlx::query_as(
-                "SELECT id, card_id, name, color FROM labels WHERE card_id = ?"
-            )
-            .bind(card.id)
-            .fetch_all(pool)
-            .await
-            .unwrap_or_default();
+            let labels: Vec<Label> =
+                sqlx::query_as("SELECT id, card_id, name, color FROM labels WHERE card_id = ?")
+                    .bind(card.id)
+                    .fetch_all(pool)
+                    .await
+                    .unwrap_or_default();
 
             let attachments: Vec<Attachment> = sqlx::query_as(
                 "SELECT id, card_id, user_id, filename, file_path, file_size, mime_type, created_at FROM attachments WHERE card_id = ?"
@@ -402,9 +436,11 @@ async fn load_board_details(
             .await
             .unwrap_or_default();
 
-            card_views.push(CardView::from_card(card)
-                .with_labels(labels)
-                .with_attachments(attachments));
+            card_views.push(
+                CardView::from_card(card)
+                    .with_labels(labels)
+                    .with_attachments(attachments),
+            );
         }
 
         lists.push(ListView::from_list(list).with_cards(card_views));
@@ -416,33 +452,41 @@ async fn load_board_details(
 }
 
 /// Проверка, является ли пользователь участником доски
-async fn is_board_member(pool: &SqlitePool, board_id: i64, user_id: i64) -> Result<bool, sqlx::Error> {
-    let result: Option<(i64,)> = sqlx::query_as(
-        "SELECT 1 FROM board_members WHERE board_id = ? AND user_id = ?"
-    )
-    .bind(board_id)
-    .bind(user_id)
-    .fetch_optional(pool)
-    .await?;
+async fn is_board_member(
+    pool: &SqlitePool,
+    board_id: i64,
+    user_id: i64,
+) -> Result<bool, sqlx::Error> {
+    let result: Option<(i64,)> =
+        sqlx::query_as("SELECT 1 FROM board_members WHERE board_id = ? AND user_id = ?")
+            .bind(board_id)
+            .bind(user_id)
+            .fetch_optional(pool)
+            .await?;
     Ok(result.is_some())
 }
 
 /// Проверка наличия роли у пользователя
-async fn has_role(pool: &SqlitePool, board_id: i64, user_id: i64, roles: &[&str]) -> Result<bool, sqlx::Error> {
+async fn has_role(
+    pool: &SqlitePool,
+    board_id: i64,
+    user_id: i64,
+    roles: &[&str],
+) -> Result<bool, sqlx::Error> {
     let placeholders = roles.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
     let query = format!(
         "SELECT 1 FROM board_members WHERE board_id = ? AND user_id = ? AND role IN ({})",
         placeholders
     );
-    
+
     let mut sqlx_query = sqlx::query_as::<_, (i64,)>(&query)
         .bind(board_id)
         .bind(user_id);
-    
+
     for role in roles {
         sqlx_query = sqlx_query.bind(*role);
     }
-    
+
     let result: Option<(i64,)> = sqlx_query.fetch_optional(pool).await?;
     Ok(result.is_some())
 }
@@ -452,18 +496,17 @@ pub async fn get_user_board_role(
     Path((board_id, user_id)): Path<(i64, i64)>,
     State(pool): State<SqlitePool>,
 ) -> Result<Json<String>, (StatusCode, String)> {
-    let role: Option<(String,)> = sqlx::query_as(
-        "SELECT role FROM board_members WHERE board_id = ? AND user_id = ?"
-    )
-    .bind(board_id)
-    .bind(user_id)
-    .fetch_optional(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let role: Option<(String,)> =
+        sqlx::query_as("SELECT role FROM board_members WHERE board_id = ? AND user_id = ?")
+            .bind(board_id)
+            .bind(user_id)
+            .fetch_optional(&pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     match role {
         Some((r,)) => Ok(Json(r)),
-        None => Err((StatusCode::NOT_FOUND, "Участник не найден".to_string()))
+        None => Err((StatusCode::NOT_FOUND, "Участник не найден".to_string())),
     }
 }
 
@@ -475,32 +518,35 @@ pub async fn create_invitation(
     Extension(claims): Extension<Claims>,
     Json(payload): Json<CreateInvitation>,
 ) -> Result<Json<InvitationView>, (StatusCode, String)> {
-    
     // Проверка прав: только owner или admin могут приглашать
-    let board: Board = sqlx::query_as::<_, Board>(
-        "SELECT * FROM boards WHERE id = ?"
-    )
-    .bind(board_id)
-    .fetch_one(&pool)
-    .await
-    .map_err(|_e| (StatusCode::NOT_FOUND, "Доска не найдена".to_string()))?;
-    
-    let has_permission = claims.user_id == board.owner_id 
-        || has_role(&pool, board_id, claims.user_id, &["owner", "admin"]).await.unwrap_or(false);
-    
+    let board: Board = sqlx::query_as::<_, Board>("SELECT * FROM boards WHERE id = ?")
+        .bind(board_id)
+        .fetch_one(&pool)
+        .await
+        .map_err(|_e| (StatusCode::NOT_FOUND, "Доска не найдена".to_string()))?;
+
+    let has_permission = claims.user_id == board.owner_id
+        || has_role(&pool, board_id, claims.user_id, &["owner", "admin"])
+            .await
+            .unwrap_or(false);
+
     if !has_permission {
-        return Err((StatusCode::FORBIDDEN, "Нет прав на создание приглашений".to_string()));
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Нет прав на создание приглашений".to_string(),
+        ));
     }
-    
+
     // Генерация токена
     let token = uuid::Uuid::new_v4().to_string();
     let expires_at = payload.expires_in_hours.map(|hours| {
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("Время не может идти вспять")
-            .as_secs() as i64 + hours * 3600
+            .as_secs() as i64
+            + hours * 3600
     });
-    
+
     let invitation: BoardInvitation = sqlx::query_as::<_, BoardInvitation>(
         "INSERT INTO board_invitations (board_id, token, role, created_by, expires_at) VALUES (?, ?, ?, ?, ?) RETURNING *"
     )
@@ -530,7 +576,6 @@ pub async fn accept_invitation(
     State(pool): State<SqlitePool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<()>, (StatusCode, String)> {
-    
     // Проверка токена
     let invitation: BoardInvitation = sqlx::query_as::<_, BoardInvitation>(
         "SELECT * FROM board_invitations WHERE token = ? AND used = 0 AND (expires_at IS NULL OR expires_at > strftime('%s', 'now'))"
@@ -539,27 +584,23 @@ pub async fn accept_invitation(
     .fetch_one(&pool)
     .await
     .map_err(|_e| (StatusCode::NOT_FOUND, "Приглашение не найдено или истекло".to_string()))?;
-    
+
     // Добавляем пользователя на доску
-    sqlx::query(
-        "INSERT OR REPLACE INTO board_members (board_id, user_id, role) VALUES (?, ?, ?)"
-    )
-    .bind(invitation.board_id)
-    .bind(claims.user_id)
-    .bind(&invitation.role)
-    .execute(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    
+    sqlx::query("INSERT OR REPLACE INTO board_members (board_id, user_id, role) VALUES (?, ?, ?)")
+        .bind(invitation.board_id)
+        .bind(claims.user_id)
+        .bind(&invitation.role)
+        .execute(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
     // Помечаем приглашение как использованное
-    sqlx::query(
-        "UPDATE board_invitations SET used = 1 WHERE token = ?"
-    )
-    .bind(&token)
-    .execute(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    
+    sqlx::query("UPDATE board_invitations SET used = 1 WHERE token = ?")
+        .bind(&token)
+        .execute(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
     Ok(Json(()))
 }
 
@@ -570,24 +611,26 @@ pub async fn get_board_invitations(
     State(pool): State<SqlitePool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<Vec<InvitationView>>, (StatusCode, String)> {
-    
-    let board: Board = sqlx::query_as::<_, Board>(
-        "SELECT * FROM boards WHERE id = ?"
-    )
-    .bind(board_id)
-    .fetch_one(&pool)
-    .await
-    .map_err(|_e| (StatusCode::NOT_FOUND, "Доска не найдена".to_string()))?;
-    
-    let has_permission = claims.user_id == board.owner_id 
-        || has_role(&pool, board_id, claims.user_id, &["owner", "admin"]).await.unwrap_or(false);
-    
+    let board: Board = sqlx::query_as::<_, Board>("SELECT * FROM boards WHERE id = ?")
+        .bind(board_id)
+        .fetch_one(&pool)
+        .await
+        .map_err(|_e| (StatusCode::NOT_FOUND, "Доска не найдена".to_string()))?;
+
+    let has_permission = claims.user_id == board.owner_id
+        || has_role(&pool, board_id, claims.user_id, &["owner", "admin"])
+            .await
+            .unwrap_or(false);
+
     if !has_permission {
-        return Err((StatusCode::FORBIDDEN, "Нет прав на просмотр приглашений".to_string()));
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Нет прав на просмотр приглашений".to_string(),
+        ));
     }
-    
+
     let invitations: Vec<BoardInvitation> = sqlx::query_as::<_, BoardInvitation>(
-        "SELECT * FROM board_invitations WHERE board_id = ? AND used = 0 ORDER BY created_at DESC"
+        "SELECT * FROM board_invitations WHERE board_id = ? AND used = 0 ORDER BY created_at DESC",
     )
     .bind(board_id)
     .fetch_all(&pool)
@@ -595,16 +638,19 @@ pub async fn get_board_invitations(
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let server_url = get_server_url();
-    let views: Vec<InvitationView> = invitations.into_iter().map(|i| {
-        let token = i.token;
-        InvitationView {
-            token: token.clone(),
-            board_id: i.board_id,
-            role: i.role,
-            expires_at: i.expires_at,
-            invite_link: format!("{}/invite/{}", server_url, token),
-        }
-    }).collect();
+    let views: Vec<InvitationView> = invitations
+        .into_iter()
+        .map(|i| {
+            let token = i.token;
+            InvitationView {
+                token: token.clone(),
+                board_id: i.board_id,
+                role: i.role,
+                expires_at: i.expires_at,
+                invite_link: format!("{}/invite/{}", server_url, token),
+            }
+        })
+        .collect();
 
     Ok(Json(views))
 }
@@ -616,29 +662,31 @@ pub async fn delete_invitation(
     State(pool): State<SqlitePool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<()>, (StatusCode, String)> {
-    
-    let board: Board = sqlx::query_as::<_, Board>(
-        "SELECT * FROM boards WHERE id = ?"
-    )
-    .bind(board_id)
-    .fetch_one(&pool)
-    .await
-    .map_err(|_e| (StatusCode::NOT_FOUND, "Доска не найдена".to_string()))?;
-    
-    let has_permission = claims.user_id == board.owner_id 
-        || has_role(&pool, board_id, claims.user_id, &["owner", "admin"]).await.unwrap_or(false);
-    
+    let board: Board = sqlx::query_as::<_, Board>("SELECT * FROM boards WHERE id = ?")
+        .bind(board_id)
+        .fetch_one(&pool)
+        .await
+        .map_err(|_e| (StatusCode::NOT_FOUND, "Доска не найдена".to_string()))?;
+
+    let has_permission = claims.user_id == board.owner_id
+        || has_role(&pool, board_id, claims.user_id, &["owner", "admin"])
+            .await
+            .unwrap_or(false);
+
     if !has_permission {
-        return Err((StatusCode::FORBIDDEN, "Нет прав на удаление приглашений".to_string()));
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Нет прав на удаление приглашений".to_string(),
+        ));
     }
-    
+
     let result = sqlx::query("DELETE FROM board_invitations WHERE board_id = ? AND token = ?")
         .bind(board_id)
         .bind(&token)
         .execute(&pool)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    
+
     if result.rows_affected() == 0 {
         Err((StatusCode::NOT_FOUND, "Приглашение не найдено".to_string()))
     } else {

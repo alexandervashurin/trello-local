@@ -1,19 +1,33 @@
-pub mod user;
+pub mod backup;
 pub mod board;
-pub mod list;
 pub mod card;
 pub mod comment;
+pub mod list;
 pub mod notification;
-pub mod template;
 pub mod oauth;
-pub mod backup;
+pub mod template;
+pub mod user;
 
-pub use user::{User, UserWithPassword, CreateUser, RegisterUser, LoginUser, Session, SessionInfo, UpdateProfile, ChangePassword, TwoFASetup, TwoFACode, TwoFAEnable, TwoFAStatus, TwoFATempToken};
-pub use board::{Board, CreateBoard, UpdateBoard, AddBoardMember, BoardMember, BoardInvitation, CreateInvitation, BoardPermission, UpdateRolePermissions};
-pub use list::{List, CreateList, UpdateList};
-pub use card::{Card, CreateCard, UpdateCard, Label, Attachment, ActivityLog, CreateLabel, UpdateLabel, Checklist, ChecklistItem, CardAssignee, CardAssigneeWithUser, CreateChecklist, CreateChecklistItem, UpdateChecklistItem, AddCardAssignee};
+pub use backup::{Backup, BackupList, CreateBackup, RestoreBackup};
+pub use board::{
+    AddBoardMember, Board, BoardInvitation, BoardMember, BoardPermission, CreateBoard,
+    CreateInvitation, UpdateBoard, UpdateRolePermissions,
+};
+pub use card::{
+    ActivityLog, AddCardAssignee, Attachment, Card, CardAssignee, CardAssigneeWithUser, Checklist,
+    ChecklistItem, CreateCard, CreateChecklist, CreateChecklistItem, CreateLabel, Label,
+    UpdateCard, UpdateChecklistItem, UpdateLabel,
+};
 pub use comment::{Comment, CommentWithUser, CreateComment, UpdateComment};
-pub use notification::{Notification, NotificationWithCreator, CreateNotification, UpdateNotificationRead};
-pub use template::{BoardTemplate, TemplateList, TemplateCard, CreateBoardTemplate, TemplateApplyResult};
+pub use list::{CreateList, List, UpdateList};
+pub use notification::{
+    CreateNotification, Notification, NotificationWithCreator, UpdateNotificationRead,
+};
 pub use oauth::{OAuthAccount, OAuthCallback, OAuthUrl, OAuthUserInfo};
-pub use backup::{Backup, CreateBackup, RestoreBackup, BackupList};
+pub use template::{
+    BoardTemplate, CreateBoardTemplate, TemplateApplyResult, TemplateCard, TemplateList,
+};
+pub use user::{
+    ChangePassword, CreateUser, LoginUser, RegisterUser, Session, SessionInfo, TwoFACode,
+    TwoFAEnable, TwoFASetup, TwoFAStatus, TwoFATempToken, UpdateProfile, User, UserWithPassword,
+};

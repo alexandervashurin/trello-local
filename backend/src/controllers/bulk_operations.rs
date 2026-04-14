@@ -1,12 +1,12 @@
+use crate::controllers::cards::get_board_id_by_card_id;
+use crate::views::Claims;
 use axum::{
-    extract::{Path, State, Extension},
+    extract::{Extension, State},
     http::StatusCode,
     Json,
 };
-use sqlx::SqlitePool;
-use crate::views::Claims;
-use crate::controllers::cards::get_board_id_by_card_id;
 use serde::Deserialize;
+use sqlx::SqlitePool;
 
 /// Запрос массового перемещения
 #[derive(Deserialize)]
@@ -155,8 +155,12 @@ pub async fn bulk_update_cards(
             continue;
         }
 
-        let query = format!("UPDATE cards SET {} WHERE id = {}", updates.join(", "), card_id);
-        
+        let query = format!(
+            "UPDATE cards SET {} WHERE id = {}",
+            updates.join(", "),
+            card_id
+        );
+
         match sqlx::query(&query).execute(&pool).await {
             Ok(_) => processed += 1,
             Err(e) => {

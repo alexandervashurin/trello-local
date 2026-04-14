@@ -1,12 +1,12 @@
 // backend/src/controllers/permissions.rs
+use crate::models::{BoardPermission, UpdateRolePermissions};
+use crate::views::Claims;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
     Extension, Json,
 };
 use sqlx::SqlitePool;
-use crate::models::{BoardPermission, UpdateRolePermissions};
-use crate::views::Claims;
 
 /// Получить все права для доски
 pub async fn get_board_permissions(
@@ -15,13 +15,12 @@ pub async fn get_board_permissions(
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<Vec<BoardPermission>>, (StatusCode, String)> {
     // Проверка прав: только owner или admin могут просматривать права
-    let board: crate::models::Board = sqlx::query_as::<_, crate::models::Board>(
-        "SELECT * FROM boards WHERE id = ?",
-    )
-    .bind(board_id)
-    .fetch_one(&pool)
-    .await
-    .map_err(|_| (StatusCode::NOT_FOUND, "Доска не найдена".to_string()))?;
+    let board: crate::models::Board =
+        sqlx::query_as::<_, crate::models::Board>("SELECT * FROM boards WHERE id = ?")
+            .bind(board_id)
+            .fetch_one(&pool)
+            .await
+            .map_err(|_| (StatusCode::NOT_FOUND, "Доска не найдена".to_string()))?;
 
     let has_permission = claims.user_id == board.owner_id
         || has_role(&pool, board_id, claims.user_id, &["owner", "admin"])
@@ -35,13 +34,12 @@ pub async fn get_board_permissions(
         ));
     }
 
-    let permissions = sqlx::query_as::<_, BoardPermission>(
-        "SELECT * FROM board_permissions WHERE board_id = ?",
-    )
-    .bind(board_id)
-    .fetch_all(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let permissions =
+        sqlx::query_as::<_, BoardPermission>("SELECT * FROM board_permissions WHERE board_id = ?")
+            .bind(board_id)
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     Ok(Json(permissions))
 }
@@ -54,13 +52,12 @@ pub async fn update_role_permissions(
     Json(payload): Json<UpdateRolePermissions>,
 ) -> Result<Json<BoardPermission>, (StatusCode, String)> {
     // Проверка прав: только owner может изменять права
-    let board: crate::models::Board = sqlx::query_as::<_, crate::models::Board>(
-        "SELECT * FROM boards WHERE id = ?",
-    )
-    .bind(board_id)
-    .fetch_one(&pool)
-    .await
-    .map_err(|_| (StatusCode::NOT_FOUND, "Доска не найдена".to_string()))?;
+    let board: crate::models::Board =
+        sqlx::query_as::<_, crate::models::Board>("SELECT * FROM boards WHERE id = ?")
+            .bind(board_id)
+            .fetch_one(&pool)
+            .await
+            .map_err(|_| (StatusCode::NOT_FOUND, "Доска не найдена".to_string()))?;
 
     if claims.user_id != board.owner_id {
         return Err((
@@ -87,7 +84,7 @@ pub async fn update_role_permissions(
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let permission = if let Some(mut perm) = existing {
+    let permission = if let Some(perm) = existing {
         // Обновляем существующие права
         let mut updates = Vec::new();
         let mut bool_values = Vec::new();
@@ -137,7 +134,7 @@ pub async fn update_role_permissions(
             return Ok(Json(perm));
         }
 
-        let mut query = format!(
+        let query = format!(
             "UPDATE board_permissions SET {} WHERE board_id = ? AND role = ? RETURNING *",
             updates.join(", ")
         );
@@ -233,13 +230,12 @@ pub async fn check_permission(
     State(pool): State<SqlitePool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<bool>, (StatusCode, String)> {
-    let board: crate::models::Board = sqlx::query_as::<_, crate::models::Board>(
-        "SELECT * FROM boards WHERE id = ?",
-    )
-    .bind(board_id)
-    .fetch_one(&pool)
-    .await
-    .map_err(|_| (StatusCode::NOT_FOUND, "Доска не найдена".to_string()))?;
+    let board: crate::models::Board =
+        sqlx::query_as::<_, crate::models::Board>("SELECT * FROM boards WHERE id = ?")
+            .bind(board_id)
+            .fetch_one(&pool)
+            .await
+            .map_err(|_| (StatusCode::NOT_FOUND, "Доска не найдена".to_string()))?;
 
     // Владелец всегда имеет все права
     if claims.user_id == board.owner_id {
@@ -247,14 +243,13 @@ pub async fn check_permission(
     }
 
     // Получаем роль пользователя
-    let member_role: Option<(String,)> = sqlx::query_as(
-        "SELECT role FROM board_members WHERE board_id = ? AND user_id = ?",
-    )
-    .bind(board_id)
-    .bind(claims.user_id)
-    .fetch_optional(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let member_role: Option<(String,)> =
+        sqlx::query_as("SELECT role FROM board_members WHERE board_id = ? AND user_id = ?")
+            .bind(board_id)
+            .bind(claims.user_id)
+            .fetch_optional(&pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let role = match member_role {
         Some((r,)) => r,

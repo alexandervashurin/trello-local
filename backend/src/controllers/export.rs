@@ -1,15 +1,15 @@
-use axum::{
-    extract::{Path, State, Extension},
-    http::{StatusCode, HeaderMap},
-    Json,
-    response::Response,
-    body::Body,
-};
-use sqlx::SqlitePool;
+use crate::models::{Board, Card, Label, List};
 use crate::views::Claims;
-use crate::models::{Board, List, Card, Label};
-use serde::Serialize;
+use axum::{
+    body::Body,
+    extract::{Extension, Path, State},
+    http::{HeaderMap, StatusCode},
+    response::Response,
+    Json,
+};
 use chrono::Utc;
+use serde::Serialize;
+use sqlx::SqlitePool;
 
 /// Данные для экспорта доски
 #[derive(Serialize)]
@@ -54,16 +54,21 @@ pub async fn export_board_json(
     Extension(claims): Extension<Claims>,
 ) -> Result<Response, (StatusCode, String)> {
     let board_data = get_board_export_data(&pool, board_id, claims.user_id).await?;
-    
+
     let json = serde_json::to_string_pretty(&board_data)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let mut headers = HeaderMap::new();
-    headers.insert("Content-Type", "application/json".parse()
-        .expect("Content-Type должен быть валидным заголовком"));
+    headers.insert(
+        "Content-Type",
+        "application/json"
+            .parse()
+            .expect("Content-Type должен быть валидным заголовком"),
+    );
     headers.insert(
         "Content-Disposition",
-        format!("attachment; filename=\"board_{}_export.json\"", board_id).parse()
+        format!("attachment; filename=\"board_{}_export.json\"", board_id)
+            .parse()
             .expect("Content-Disposition должен быть валидным заголовком"),
     );
 
@@ -80,27 +85,39 @@ pub async fn export_board_csv(
     Extension(claims): Extension<Claims>,
 ) -> Result<Response, (StatusCode, String)> {
     let board_data = get_board_export_data(&pool, board_id, claims.user_id).await?;
-    
+
     let mut csv = String::new();
-    
+
     // Заголовок CSV
     csv.push_str("List,Card,Description,Status,Due Date,Labels\n");
-    
+
     // Данные
     for list in &board_data.lists {
         for card in &list.cards {
-            let labels = card.labels.iter().map(|l| l.name.clone()).collect::<Vec<_>>().join("; ");
-            let due_date = card.due_date
-                .map(|ts| chrono::DateTime::from_timestamp(ts, 0)
-                    .map(|dt| dt.format("%Y-%m-%d %H:%M").to_string())
-                    .unwrap_or_default())
+            let labels = card
+                .labels
+                .iter()
+                .map(|l| l.name.clone())
+                .collect::<Vec<_>>()
+                .join("; ");
+            let due_date = card
+                .due_date
+                .map(|ts| {
+                    chrono::DateTime::from_timestamp(ts, 0)
+                        .map(|dt| dt.format("%Y-%m-%d %H:%M").to_string())
+                        .unwrap_or_default()
+                })
                 .unwrap_or_default();
             let status = if card.done { "Done" } else { "Todo" };
-            
+
             // Экранирование кавычек в CSV
             let title = card.title.replace('"', "\"\"");
-            let content = card.content.as_ref().map(|s| s.replace('"', "\"\"")).unwrap_or_default();
-            
+            let content = card
+                .content
+                .as_ref()
+                .map(|s| s.replace('"', "\"\""))
+                .unwrap_or_default();
+
             csv.push_str(&format!(
                 "\"{}\",\"{}\",\"{}\",\"{}\",\"{}\",\"{}\"\n",
                 list.title.replace('"', "\"\""),
@@ -114,11 +131,16 @@ pub async fn export_board_csv(
     }
 
     let mut headers = HeaderMap::new();
-    headers.insert("Content-Type", "text/csv".parse()
-        .expect("Content-Type должен быть валидным заголовком"));
+    headers.insert(
+        "Content-Type",
+        "text/csv"
+            .parse()
+            .expect("Content-Type должен быть валидным заголовком"),
+    );
     headers.insert(
         "Content-Disposition",
-        format!("attachment; filename=\"board_{}_export.csv\"", board_id).parse()
+        format!("attachment; filename=\"board_{}_export.csv\"", board_id)
+            .parse()
             .expect("Content-Disposition должен быть валидным заголовком"),
     );
 
@@ -167,13 +189,12 @@ async fn get_board_export_data(
 
         let mut card_exports = Vec::new();
         for card in cards {
-            let labels: Vec<Label> = sqlx::query_as(
-                "SELECT id, card_id, name, color FROM labels WHERE card_id = ?",
-            )
-            .bind(card.id)
-            .fetch_all(pool)
-            .await
-            .unwrap_or_default();
+            let labels: Vec<Label> =
+                sqlx::query_as("SELECT id, card_id, name, color FROM labels WHERE card_id = ?")
+                    .bind(card.id)
+                    .fetch_all(pool)
+                    .await
+                    .unwrap_or_default();
 
             card_exports.push(CardExport {
                 id: card.id,
@@ -181,11 +202,14 @@ async fn get_board_export_data(
                 content: card.content,
                 done: card.done,
                 due_date: card.due_date,
-                labels: labels.into_iter().map(|l| LabelExport {
-                    id: l.id,
-                    name: l.name,
-                    color: l.color,
-                }).collect(),
+                labels: labels
+                    .into_iter()
+                    .map(|l| LabelExport {
+                        id: l.id,
+                        name: l.name,
+                        color: l.color,
+                    })
+                    .collect(),
             });
         }
 

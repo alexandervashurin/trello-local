@@ -12,7 +12,7 @@ pub async fn connect() -> Result<SqlitePool, Box<dyn std::error::Error>> {
 
     // Формируем URL с явным указанием создания БД если нет
     let db_url = format!("sqlite://{}?mode=rwc", db_path.display());
-    
+
     let pool = SqlitePool::connect(&db_url).await?;
 
     // Миграции
@@ -345,21 +345,21 @@ pub async fn connect() -> Result<SqlitePool, Box<dyn std::error::Error>> {
     )
     .execute(&pool)
     .await?;
-    
+
     sqlx::query(
         "INSERT OR IGNORE INTO board_permissions (board_id, role, can_view, can_create_cards, can_edit_cards, can_delete_cards, can_move_cards, can_create_lists, can_edit_lists, can_delete_lists, can_manage_members, can_manage_settings)
          VALUES (1, 'admin', 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)",
     )
     .execute(&pool)
     .await?;
-    
+
     sqlx::query(
         "INSERT OR IGNORE INTO board_permissions (board_id, role, can_view, can_create_cards, can_edit_cards, can_delete_cards, can_move_cards, can_create_lists, can_edit_lists, can_delete_lists, can_manage_members, can_manage_settings)
          VALUES (1, 'member', 1, 1, 0, 0, 0, 0, 0, 0, 0, 0)",
     )
     .execute(&pool)
     .await?;
-    
+
     sqlx::query(
         "INSERT OR IGNORE INTO board_permissions (board_id, role, can_view, can_create_cards, can_edit_cards, can_delete_cards, can_move_cards, can_create_lists, can_edit_lists, can_delete_lists, can_manage_members, can_manage_settings)
          VALUES (1, 'viewer', 1, 0, 0, 0, 0, 0, 0, 0, 0, 0)",
@@ -368,6 +368,6 @@ pub async fn connect() -> Result<SqlitePool, Box<dyn std::error::Error>> {
     .await?;
 
     println!("✅ База данных подключена: {}", db_path.display());
-    
+
     Ok(pool)
 }

@@ -1,10 +1,10 @@
 use axum::{
-    extract::{Path, State, Query},
+    extract::{Path, Query, State},
     http::StatusCode,
     Json,
 };
-use sqlx::SqlitePool;
 use serde::Deserialize;
+use sqlx::SqlitePool;
 
 /// Параметры поиска карточек
 #[derive(Deserialize, Default)]
@@ -38,7 +38,17 @@ pub struct LabelInfo {
 }
 
 /// Тип для строки результата поиска карточек
-type CardSearchRow = (i64, String, Option<String>, bool, Option<i64>, i64, String, i64, String);
+type CardSearchRow = (
+    i64,
+    String,
+    Option<String>,
+    bool,
+    Option<i64>,
+    i64,
+    String,
+    i64,
+    String,
+);
 
 /// Поиск карточек на доске
 pub async fn search_cards_on_board(
@@ -47,7 +57,11 @@ pub async fn search_cards_on_board(
     Query(query): Query<CardSearchQuery>,
 ) -> Result<Json<Vec<CardSearchResult>>, (StatusCode, String)> {
     // Построение запроса в зависимости от параметров
-    let cards: Vec<CardSearchRow> = if query.q.is_none() && query.label_color.is_none() && query.label_name.is_none() && query.done.is_none() {
+    let cards: Vec<CardSearchRow> = if query.q.is_none()
+        && query.label_color.is_none()
+        && query.label_name.is_none()
+        && query.done.is_none()
+    {
         // Без фильтров
         sqlx::query_as(
             r#"
@@ -106,16 +120,33 @@ pub async fn search_cards_on_board(
         }
 
         if query.label_color.is_some() {
-            sql.push_str(" AND EXISTS (SELECT 1 FROM labels lbl WHERE lbl.card_id = c.id AND lbl.color = ?)");
+            sql.push_str(
+                " AND EXISTS (SELECT 1 FROM labels lbl WHERE lbl.card_id = c.id AND lbl.color = ?)",
+            );
         }
 
         if query.label_name.is_some() {
-            sql.push_str(" AND EXISTS (SELECT 1 FROM labels lbl WHERE lbl.card_id = c.id AND lbl.name = ?)");
+            sql.push_str(
+                " AND EXISTS (SELECT 1 FROM labels lbl WHERE lbl.card_id = c.id AND lbl.name = ?)",
+            );
         }
 
         sql.push_str(" ORDER BY c.position, c.id");
 
-        let mut query_builder = sqlx::query_as::<_, (i64, String, Option<String>, bool, Option<i64>, i64, String, i64, String)>(&sql);
+        let mut query_builder = sqlx::query_as::<
+            _,
+            (
+                i64,
+                String,
+                Option<String>,
+                bool,
+                Option<i64>,
+                i64,
+                String,
+                i64,
+                String,
+            ),
+        >(&sql);
         query_builder = query_builder.bind(board_id);
 
         if let Some(done) = query.done {
@@ -138,15 +169,14 @@ pub async fn search_cards_on_board(
     let mut results = Vec::new();
     for row in cards {
         let card_id = row.0;
-        
+
         // Загружаем метки для карточки
-        let labels: Vec<(i64, String, String)> = sqlx::query_as(
-            "SELECT id, name, color FROM labels WHERE card_id = ?"
-        )
-        .bind(card_id)
-        .fetch_all(&pool)
-        .await
-        .unwrap_or_default();
+        let labels: Vec<(i64, String, String)> =
+            sqlx::query_as("SELECT id, name, color FROM labels WHERE card_id = ?")
+                .bind(card_id)
+                .fetch_all(&pool)
+                .await
+                .unwrap_or_default();
 
         results.push(CardSearchResult {
             id: row.0,
@@ -158,11 +188,14 @@ pub async fn search_cards_on_board(
             list_title: row.6,
             board_id: row.7,
             board_title: row.8,
-            labels: labels.into_iter().map(|l| LabelInfo {
-                id: l.0,
-                name: l.1,
-                color: l.2,
-            }).collect(),
+            labels: labels
+                .into_iter()
+                .map(|l| LabelInfo {
+                    id: l.0,
+                    name: l.1,
+                    color: l.2,
+                })
+                .collect(),
         });
     }
 
@@ -189,11 +222,16 @@ pub async fn get_board_labels(
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    Ok(Json(labels.into_iter().map(|l| LabelInfo {
-        id: l.0,
-        name: l.1,
-        color: l.2,
-    }).collect()))
+    Ok(Json(
+        labels
+            .into_iter()
+            .map(|l| LabelInfo {
+                id: l.0,
+                name: l.1,
+                color: l.2,
+            })
+            .collect(),
+    ))
 }
 
 /// Быстрый поиск карточек по всем доскам (глобальный поиск)
@@ -248,14 +286,13 @@ pub async fn global_card_search(
     let mut results = Vec::new();
     for row in cards {
         let card_id = row.0;
-        
-        let labels: Vec<(i64, String, String)> = sqlx::query_as(
-            "SELECT id, name, color FROM labels WHERE card_id = ?"
-        )
-        .bind(card_id)
-        .fetch_all(&pool)
-        .await
-        .unwrap_or_default();
+
+        let labels: Vec<(i64, String, String)> =
+            sqlx::query_as("SELECT id, name, color FROM labels WHERE card_id = ?")
+                .bind(card_id)
+                .fetch_all(&pool)
+                .await
+                .unwrap_or_default();
 
         results.push(CardSearchResult {
             id: row.0,
@@ -267,11 +304,14 @@ pub async fn global_card_search(
             list_title: row.6,
             board_id: row.7,
             board_title: row.8,
-            labels: labels.into_iter().map(|l| LabelInfo {
-                id: l.0,
-                name: l.1,
-                color: l.2,
-            }).collect(),
+            labels: labels
+                .into_iter()
+                .map(|l| LabelInfo {
+                    id: l.0,
+                    name: l.1,
+                    color: l.2,
+                })
+                .collect(),
         });
     }
 

@@ -1,11 +1,11 @@
 use axum::{
-    extract::{Path, State, Query},
+    extract::{Path, Query, State},
     http::StatusCode,
     Json,
 };
-use sqlx::SqlitePool;
-use serde::Deserialize;
 use chrono::Datelike;
+use serde::Deserialize;
+use sqlx::SqlitePool;
 
 /// Параметры запроса календаря
 #[derive(Deserialize, Default)]
@@ -64,8 +64,18 @@ pub async fn get_calendar(
 
     // Название месяца
     let month_names = [
-        "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
-        "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
+        "Январь",
+        "Февраль",
+        "Март",
+        "Апрель",
+        "Май",
+        "Июнь",
+        "Июль",
+        "Август",
+        "Сентябрь",
+        "Октябрь",
+        "Ноябрь",
+        "Декабрь",
     ];
     let month_name = if (1..=12).contains(&month) {
         month_names[(month - 1) as usize]
@@ -157,7 +167,8 @@ pub async fn get_calendar(
     let mut days = Vec::new();
     for day in 1..=days_in_month {
         let cards_count = cards_by_day.get(&day).map(|v| v.len() as u32).unwrap_or(0);
-        let day_overdue = cards_by_day.get(&day)
+        let day_overdue = cards_by_day
+            .get(&day)
             .map(|v| v.iter().filter(|c| c.is_overdue).count() as u32)
             .unwrap_or(0);
 
@@ -224,20 +235,23 @@ pub async fn get_cards_for_day(
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let result = cards.into_iter().map(|row| {
-        let is_overdue = !row.2 && row.3 < now_timestamp;
-        CalendarCard {
-            id: row.0,
-            title: row.1,
-            done: row.2,
-            due_date: row.3,
-            list_id: row.4,
-            list_title: row.5,
-            board_id: row.6,
-            board_title: row.7,
-            is_overdue,
-        }
-    }).collect();
+    let result = cards
+        .into_iter()
+        .map(|row| {
+            let is_overdue = !row.2 && row.3 < now_timestamp;
+            CalendarCard {
+                id: row.0,
+                title: row.1,
+                done: row.2,
+                due_date: row.3,
+                list_id: row.4,
+                list_title: row.5,
+                board_id: row.6,
+                board_title: row.7,
+                is_overdue,
+            }
+        })
+        .collect();
 
     Ok(Json(result))
 }

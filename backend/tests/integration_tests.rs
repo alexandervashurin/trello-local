@@ -1,4 +1,7 @@
-use axum::{body::Body, http::{Request, StatusCode}};
+use axum::{
+    body::Body,
+    http::{Request, StatusCode},
+};
 use serde_json::json;
 use sqlx::SqlitePool;
 use tower::util::ServiceExt;
@@ -75,10 +78,12 @@ async fn init_db(pool: &SqlitePool) {
     .expect("Failed to create tables");
 
     // Создаём тестового пользователя
-    sqlx::query("INSERT INTO users (id, username, created_at) VALUES (1, 'test', strftime('%s', 'now'))")
-        .execute(pool)
-        .await
-        .expect("Failed to create test user");
+    sqlx::query(
+        "INSERT INTO users (id, username, created_at) VALUES (1, 'test', strftime('%s', 'now'))",
+    )
+    .execute(pool)
+    .await
+    .expect("Failed to create test user");
 }
 
 #[tokio::test]
@@ -88,7 +93,10 @@ async fn test_create_board() {
 
     use backend::controllers::boards;
     let app: axum::Router = axum::Router::new()
-        .route("/api/boards", axum::routing::get(boards::get_boards).post(boards::create_board))
+        .route(
+            "/api/boards",
+            axum::routing::get(boards::get_boards).post(boards::create_board),
+        )
         .with_state(pool);
 
     // Создаём доску
@@ -98,7 +106,9 @@ async fn test_create_board() {
                 .method("POST")
                 .uri("/api/boards")
                 .header("Content-Type", "application/json")
-                .body(Body::from(json!({ "title": "Тестовая доска", "is_shared": false }).to_string()))
+                .body(Body::from(
+                    json!({ "title": "Тестовая доска", "is_shared": false }).to_string(),
+                ))
                 .unwrap(),
         )
         .await
@@ -114,7 +124,10 @@ async fn test_get_boards() {
 
     use backend::controllers::boards;
     let app: axum::Router = axum::Router::new()
-        .route("/api/boards", axum::routing::get(boards::get_boards).post(boards::create_board))
+        .route(
+            "/api/boards",
+            axum::routing::get(boards::get_boards).post(boards::create_board),
+        )
         .with_state(pool);
 
     // Создаём доску
@@ -125,7 +138,9 @@ async fn test_get_boards() {
                 .method("POST")
                 .uri("/api/boards")
                 .header("Content-Type", "application/json")
-                .body(Body::from(json!({ "title": "Тестовая доска", "is_shared": false }).to_string()))
+                .body(Body::from(
+                    json!({ "title": "Тестовая доска", "is_shared": false }).to_string(),
+                ))
                 .unwrap(),
         )
         .await
@@ -155,13 +170,18 @@ async fn test_create_list() {
     use backend::models::Board;
 
     // Сначала создаём доску
-    let board: Board = sqlx::query_as("INSERT INTO boards (title, owner_id, is_shared) VALUES ('Test', 1, 0) RETURNING *")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    let board: Board = sqlx::query_as(
+        "INSERT INTO boards (title, owner_id, is_shared) VALUES ('Test', 1, 0) RETURNING *",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
 
     let app: axum::Router = axum::Router::new()
-        .route("/api/boards/:board_id/lists", axum::routing::post(lists::create_list))
+        .route(
+            "/api/boards/:board_id/lists",
+            axum::routing::post(lists::create_list),
+        )
         .with_state(pool);
 
     let response = app
@@ -170,7 +190,9 @@ async fn test_create_list() {
                 .method("POST")
                 .uri(format!("/api/boards/{}/lists", board.id))
                 .header("Content-Type", "application/json")
-                .body(Body::from(json!({ "title": "Тестовый список" }).to_string()))
+                .body(Body::from(
+                    json!({ "title": "Тестовый список" }).to_string(),
+                ))
                 .unwrap(),
         )
         .await
@@ -188,19 +210,26 @@ async fn test_create_card() {
     use backend::models::{Board, List};
 
     // Создаём доску и список
-    let board: Board = sqlx::query_as("INSERT INTO boards (title, owner_id, is_shared) VALUES ('Test', 1, 0) RETURNING *")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-    
-    let list: List = sqlx::query_as("INSERT INTO lists (board_id, title, position) VALUES (?, 'Test List', 0) RETURNING *")
-        .bind(board.id)
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    let board: Board = sqlx::query_as(
+        "INSERT INTO boards (title, owner_id, is_shared) VALUES ('Test', 1, 0) RETURNING *",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    let list: List = sqlx::query_as(
+        "INSERT INTO lists (board_id, title, position) VALUES (?, 'Test List', 0) RETURNING *",
+    )
+    .bind(board.id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
 
     let app: axum::Router = axum::Router::new()
-        .route("/api/lists/:list_id/cards", axum::routing::post(cards::create_card))
+        .route(
+            "/api/lists/:list_id/cards",
+            axum::routing::post(cards::create_card),
+        )
         .with_state(pool);
 
     let response = app
@@ -209,7 +238,9 @@ async fn test_create_card() {
                 .method("POST")
                 .uri(format!("/api/lists/{}/cards", list.id))
                 .header("Content-Type", "application/json")
-                .body(Body::from(json!({ "title": "Тестовая карточка", "content": "Описание" }).to_string()))
+                .body(Body::from(
+                    json!({ "title": "Тестовая карточка", "content": "Описание" }).to_string(),
+                ))
                 .unwrap(),
         )
         .await
@@ -234,7 +265,9 @@ async fn test_auth_register() {
                 .method("POST")
                 .uri("/api/auth/register")
                 .header("Content-Type", "application/json")
-                .body(Body::from(json!({ "username": "newuser", "password": "Password123" }).to_string()))
+                .body(Body::from(
+                    json!({ "username": "newuser", "password": "Password123" }).to_string(),
+                ))
                 .unwrap(),
         )
         .await
@@ -269,7 +302,9 @@ async fn test_auth_login() {
                 .method("POST")
                 .uri("/api/auth/login")
                 .header("Content-Type", "application/json")
-                .body(Body::from(json!({ "username": "loginuser", "password": "password123" }).to_string()))
+                .body(Body::from(
+                    json!({ "username": "loginuser", "password": "password123" }).to_string(),
+                ))
                 .unwrap(),
         )
         .await
@@ -286,8 +321,14 @@ async fn test_search_boards() {
     use backend::controllers::boards;
 
     // Создаём доски
-    sqlx::query("INSERT INTO boards (title, owner_id, is_shared) VALUES ('Project A', 1, 0)").execute(&pool).await.unwrap();
-    sqlx::query("INSERT INTO boards (title, owner_id, is_shared) VALUES ('Project B', 1, 0)").execute(&pool).await.unwrap();
+    sqlx::query("INSERT INTO boards (title, owner_id, is_shared) VALUES ('Project A', 1, 0)")
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO boards (title, owner_id, is_shared) VALUES ('Project B', 1, 0)")
+        .execute(&pool)
+        .await
+        .unwrap();
 
     let app: axum::Router = axum::Router::new()
         .route("/api/boards", axum::routing::get(boards::get_boards))
@@ -313,19 +354,23 @@ async fn test_comments() {
     let pool = create_test_pool().await;
     init_db(&pool).await;
 
-    use backend::models::{Board, List, Card};
+    use backend::models::{Board, Card, List};
 
     // Создаём доску, список и карточку
-    let board: Board = sqlx::query_as("INSERT INTO boards (title, owner_id, is_shared) VALUES ('Test', 1, 0) RETURNING *")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    let board: Board = sqlx::query_as(
+        "INSERT INTO boards (title, owner_id, is_shared) VALUES ('Test', 1, 0) RETURNING *",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
 
-    let list: List = sqlx::query_as("INSERT INTO lists (board_id, title, position) VALUES (?, 'Test List', 0) RETURNING *")
-        .bind(board.id)
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    let list: List = sqlx::query_as(
+        "INSERT INTO lists (board_id, title, position) VALUES (?, 'Test List', 0) RETURNING *",
+    )
+    .bind(board.id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
 
     let card: Card = sqlx::query_as("INSERT INTO cards (list_id, title, content, done) VALUES (?, 'Test Card', 'Content', 0) RETURNING *")
         .bind(list.id)
@@ -343,7 +388,7 @@ async fn test_comments() {
 
     // Тест создания комментария напрямую через БД
     let result: Result<(i64,), _> = sqlx::query_as(
-        "INSERT INTO comments (card_id, user_id, content) VALUES (?, ?, ?) RETURNING id"
+        "INSERT INTO comments (card_id, user_id, content) VALUES (?, ?, ?) RETURNING id",
     )
     .bind(card.id)
     .bind(2)

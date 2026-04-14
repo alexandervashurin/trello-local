@@ -1,12 +1,14 @@
+use crate::models::{
+    BoardTemplate, CreateBoardTemplate, TemplateApplyResult, TemplateCard, TemplateList,
+};
+use crate::views::Claims;
 use axum::{
-    extract::{Path, State, Extension},
+    extract::{Extension, Path, State},
     http::StatusCode,
     Json,
 };
 use serde::Deserialize;
 use sqlx::SqlitePool;
-use crate::models::{BoardTemplate, TemplateList, TemplateCard, CreateBoardTemplate, TemplateApplyResult};
-use crate::views::Claims;
 
 /// Получить все шаблоны пользователя
 pub async fn get_templates(
@@ -88,14 +90,13 @@ pub async fn create_template_from_board(
     Json(payload): Json<CreateBoardTemplate>,
 ) -> Result<Json<BoardTemplate>, (StatusCode, String)> {
     // Проверка прав на доску
-    let has_access: Option<(i64,)> = sqlx::query_as(
-        "SELECT 1 FROM boards WHERE id = ? AND owner_id = ?",
-    )
-    .bind(board_id)
-    .bind(claims.user_id)
-    .fetch_optional(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let has_access: Option<(i64,)> =
+        sqlx::query_as("SELECT 1 FROM boards WHERE id = ? AND owner_id = ?")
+            .bind(board_id)
+            .bind(claims.user_id)
+            .fetch_optional(&pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     if has_access.is_none() {
         return Err((StatusCode::FORBIDDEN, "Нет доступа к доске".to_string()));
@@ -165,14 +166,12 @@ pub async fn delete_template(
     State(pool): State<SqlitePool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<()>, (StatusCode, String)> {
-    let result = sqlx::query(
-        "DELETE FROM board_templates WHERE id = ? AND user_id = ?",
-    )
-    .bind(template_id)
-    .bind(claims.user_id)
-    .execute(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let result = sqlx::query("DELETE FROM board_templates WHERE id = ? AND user_id = ?")
+        .bind(template_id)
+        .bind(claims.user_id)
+        .execute(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     if result.rows_affected() == 0 {
         Err((StatusCode::NOT_FOUND, "Шаблон не найден".to_string()))
@@ -199,7 +198,9 @@ pub async fn apply_template(
     .map_err(|_| (StatusCode::NOT_FOUND, "Шаблон не найден".to_string()))?;
 
     // Создаём новую доску
-    let board_title = payload.title.unwrap_or_else(|| format!("{} (копия)", template.title));
+    let board_title = payload
+        .title
+        .unwrap_or_else(|| format!("{} (копия)", template.title));
     let board_id: i64 = sqlx::query_scalar(
         "INSERT INTO boards (title, owner_id, is_shared) VALUES (?, ?, 0) RETURNING id",
     )
@@ -210,13 +211,12 @@ pub async fn apply_template(
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     // Добавляем владельца как участника
-    let _ = sqlx::query(
-        "INSERT INTO board_members (board_id, user_id, role) VALUES (?, ?, 'owner')",
-    )
-    .bind(board_id)
-    .bind(claims.user_id)
-    .execute(&pool)
-    .await;
+    let _ =
+        sqlx::query("INSERT INTO board_members (board_id, user_id, role) VALUES (?, ?, 'owner')")
+            .bind(board_id)
+            .bind(claims.user_id)
+            .execute(&pool)
+            .await;
 
     // Получаем списки шаблона
     let template_lists: Vec<(i64, String, i64)> = sqlx::query_as(

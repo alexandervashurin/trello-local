@@ -1,22 +1,22 @@
+use crate::models::{
+    ActivityLog, Attachment, Card, CreateCard, CreateLabel, Label, UpdateCard, UpdateLabel,
+};
+use crate::views::Claims;
 use axum::{
-    extract::{Path, State, Extension},
+    extract::{Extension, Path, State},
     http::StatusCode,
     Json,
 };
 use sqlx::SqlitePool;
-use crate::models::{Card, CreateCard, UpdateCard, Label, CreateLabel, UpdateLabel, Attachment, ActivityLog};
-use crate::views::Claims;
 
 /// Вспомогательная функция для получения board_id по list_id
 async fn get_board_id_by_list_id(pool: &SqlitePool, list_id: i64) -> Option<i64> {
-    let result: Option<(i64,)> = sqlx::query_as(
-        "SELECT board_id FROM lists WHERE id = ?"
-    )
-    .bind(list_id)
-    .fetch_optional(pool)
-    .await
-    .ok()
-    .flatten();
+    let result: Option<(i64,)> = sqlx::query_as("SELECT board_id FROM lists WHERE id = ?")
+        .bind(list_id)
+        .fetch_optional(pool)
+        .await
+        .ok()
+        .flatten();
     result.map(|r| r.0)
 }
 
@@ -26,7 +26,7 @@ pub async fn get_card(
     State(pool): State<SqlitePool>,
 ) -> Result<Json<Card>, (StatusCode, String)> {
     let card: Card = sqlx::query_as::<_, Card>(
-        "SELECT id, list_id, title, content, done, due_date FROM cards WHERE id = ?"
+        "SELECT id, list_id, title, content, done, due_date FROM cards WHERE id = ?",
     )
     .bind(id)
     .fetch_one(&pool)
@@ -50,14 +50,21 @@ pub async fn create_card(
 ) -> Result<Json<Card>, (StatusCode, String)> {
     // Валидация названия
     if payload.title.trim().is_empty() {
-        return Err((StatusCode::BAD_REQUEST, "Название не может быть пустым".to_string()));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Название не может быть пустым".to_string(),
+        ));
     }
     if payload.title.len() > 200 {
-        return Err((StatusCode::BAD_REQUEST, "Название слишком длинное".to_string()));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Название слишком длинное".to_string(),
+        ));
     }
 
     // Получаем board_id из list_id
-    let board_id = get_board_id_by_list_id(&pool, list_id).await
+    let board_id = get_board_id_by_list_id(&pool, list_id)
+        .await
         .ok_or((StatusCode::NOT_FOUND, "Список не найден".to_string()))?;
 
     let card: Card = sqlx::query_as::<_, Card>(
@@ -81,7 +88,8 @@ pub async fn create_card(
         Some(card.id),
         &format!("Создана карточка \"{}\"", &payload.title),
         None,
-    ).await;
+    )
+    .await;
 
     Ok(Json(card))
 }
@@ -94,7 +102,7 @@ pub async fn update_card(
     Json(payload): Json<UpdateCard>,
 ) -> Result<Json<Card>, (StatusCode, String)> {
     let current: Card = sqlx::query_as::<_, Card>(
-        "SELECT id, list_id, title, content, done, due_date FROM cards WHERE id = ?"
+        "SELECT id, list_id, title, content, done, due_date FROM cards WHERE id = ?",
     )
     .bind(id)
     .fetch_one(&pool)
@@ -114,7 +122,8 @@ pub async fn update_card(
     let new_due_date = payload.due_date.or(current.due_date);
 
     // Получаем board_id для логирования
-    let board_id = get_board_id_by_list_id(&pool, new_list_id).await
+    let board_id = get_board_id_by_list_id(&pool, new_list_id)
+        .await
         .ok_or((StatusCode::NOT_FOUND, "Доска не найдена".to_string()))?;
 
     let updated: Card = sqlx::query_as(
@@ -139,7 +148,11 @@ pub async fn update_card(
         changes.push("описание изменено".to_string());
     }
     if payload.done.is_some() && payload.done != Some(current.done) {
-        changes.push(if new_done { "отмечена выполненной".to_string() } else { "возвращена в работу".to_string() });
+        changes.push(if new_done {
+            "отмечена выполненной".to_string()
+        } else {
+            "возвращена в работу".to_string()
+        });
     }
     if payload.due_date.is_some() && payload.due_date != current.due_date {
         changes.push("дедлайн изменён".to_string());
@@ -158,7 +171,8 @@ pub async fn update_card(
             Some(id),
             &format!("Карточка \"{}\": {}", current.title, changes.join(", ")),
             None,
-        ).await;
+        )
+        .await;
 
         // Сохраняем версию карточки
         let change_summary = changes.join("; ");
@@ -167,7 +181,8 @@ pub async fn update_card(
             id,
             claims.user_id,
             &change_summary,
-        ).await;
+        )
+        .await;
     }
 
     Ok(Json(updated))
@@ -179,18 +194,19 @@ pub async fn delete_card(
     State(pool): State<SqlitePool>,
 ) -> Result<Json<()>, (StatusCode, String)> {
     // Получаем информацию о карточке перед удалением
-    let card: Option<(String, i64)> = sqlx::query_as(
-        "SELECT title, list_id FROM cards WHERE id = ?"
-    )
-    .bind(id)
-    .fetch_optional(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let card: Option<(String, i64)> =
+        sqlx::query_as("SELECT title, list_id FROM cards WHERE id = ?")
+            .bind(id)
+            .fetch_optional(&pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let (title, list_id) = card.ok_or((StatusCode::NOT_FOUND, "Карточка не найдена".to_string()))?;
+    let (title, list_id) =
+        card.ok_or((StatusCode::NOT_FOUND, "Карточка не найдена".to_string()))?;
 
     // Получаем board_id
-    let board_id = get_board_id_by_list_id(&pool, list_id).await
+    let board_id = get_board_id_by_list_id(&pool, list_id)
+        .await
         .ok_or((StatusCode::NOT_FOUND, "Доска не найдена".to_string()))?;
 
     let result = sqlx::query("DELETE FROM cards WHERE id = ?")
@@ -212,7 +228,8 @@ pub async fn delete_card(
             Some(id),
             &format!("Удалена карточка \"{}\"", title),
             None,
-        ).await;
+        )
+        .await;
         Ok(Json(()))
     }
 }
@@ -235,13 +252,12 @@ pub async fn get_card_labels(
     Path(card_id): Path<i64>,
     State(pool): State<SqlitePool>,
 ) -> Result<Json<Vec<Label>>, (StatusCode, String)> {
-    let labels: Vec<Label> = sqlx::query_as(
-        "SELECT id, card_id, name, color FROM labels WHERE card_id = ?"
-    )
-    .bind(card_id)
-    .fetch_all(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let labels: Vec<Label> =
+        sqlx::query_as("SELECT id, card_id, name, color FROM labels WHERE card_id = ?")
+            .bind(card_id)
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     Ok(Json(labels))
 }
@@ -275,7 +291,8 @@ pub async fn create_label(
             Some(label.id),
             &format!("Добавлена метка \"{}\" к карточке", &payload.name),
             None,
-        ).await;
+        )
+        .await;
     }
 
     Ok(Json(label))
@@ -288,7 +305,7 @@ pub async fn update_label(
     Json(payload): Json<UpdateLabel>,
 ) -> Result<Json<Label>, (StatusCode, String)> {
     let current: Label = sqlx::query_as::<_, Label>(
-        "SELECT id, card_id, name, color FROM labels WHERE id = ? AND card_id = ?"
+        "SELECT id, card_id, name, color FROM labels WHERE id = ? AND card_id = ?",
     )
     .bind(label_id)
     .bind(card_id)
@@ -300,7 +317,7 @@ pub async fn update_label(
     let new_color = payload.color.clone().unwrap_or(current.color.clone());
 
     let updated: Label = sqlx::query_as(
-        "UPDATE labels SET name = ?, color = ? WHERE id = ? RETURNING id, card_id, name, color"
+        "UPDATE labels SET name = ?, color = ? WHERE id = ? RETURNING id, card_id, name, color",
     )
     .bind(&new_name)
     .bind(&new_color)
@@ -328,7 +345,8 @@ pub async fn update_label(
                 Some(label_id),
                 &format!("Метка \"{}\": {}", current.name, changes.join(", ")),
                 None,
-            ).await;
+            )
+            .await;
         }
     }
 
@@ -341,16 +359,17 @@ pub async fn delete_label(
     State(pool): State<SqlitePool>,
 ) -> Result<Json<()>, (StatusCode, String)> {
     // Получаем название метки перед удалением
-    let label_name: Option<(String,)> = sqlx::query_as(
-        "SELECT name FROM labels WHERE id = ? AND card_id = ?"
-    )
-    .bind(label_id)
-    .bind(card_id)
-    .fetch_optional(&pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let label_name: Option<(String,)> =
+        sqlx::query_as("SELECT name FROM labels WHERE id = ? AND card_id = ?")
+            .bind(label_id)
+            .bind(card_id)
+            .fetch_optional(&pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let name = label_name.map(|l| l.0).unwrap_or_else(|| "неизвестно".to_string());
+    let name = label_name
+        .map(|l| l.0)
+        .unwrap_or_else(|| "неизвестно".to_string());
 
     let result = sqlx::query("DELETE FROM labels WHERE id = ? AND card_id = ?")
         .bind(label_id)
@@ -373,7 +392,8 @@ pub async fn delete_label(
                 Some(label_id),
                 &format!("Удалена метка \"{}\"", name),
                 None,
-            ).await;
+            )
+            .await;
         }
         Ok(Json(()))
     }
@@ -437,7 +457,8 @@ pub async fn delete_attachment(
                 Some(attachment_id),
                 &format!("Удалено вложение \"{}\"", filename),
                 None,
-            ).await;
+            )
+            .await;
         }
         Ok(Json(()))
     }
@@ -483,6 +504,6 @@ pub async fn log_activity(
     .bind(metadata)
     .execute(pool)
     .await?;
-    
+
     Ok(())
 }

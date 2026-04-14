@@ -1,12 +1,12 @@
+use crate::models::{CommentWithUser, CreateComment, UpdateComment};
+use crate::views::Claims;
+use axum::extract::Extension;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
     Json,
 };
 use sqlx::SqlitePool;
-use crate::models::{CommentWithUser, CreateComment, UpdateComment};
-use crate::views::Claims;
-use axum::extract::Extension;
 
 /// Получить все комментарии к карточке
 pub async fn get_comments(
@@ -85,7 +85,10 @@ pub async fn update_comment(
 
     // Проверка: только автор может редактировать
     if current.user_id != claims.user_id {
-        return Err((StatusCode::FORBIDDEN, "Только автор может редактировать комментарий".to_string()));
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Только автор может редактировать комментарий".to_string(),
+        ));
     }
 
     let new_content = payload.content.unwrap_or(current.content);
@@ -113,17 +116,19 @@ pub async fn delete_comment(
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<()>, (StatusCode, String)> {
     // Проверяем, что комментарий принадлежит пользователю
-    let comment_user_id: Option<i64> = sqlx::query_scalar(
-        "SELECT user_id FROM comments WHERE id = ?"
-    )
-    .bind(id)
-    .fetch_one(&pool)
-    .await
-    .ok();
+    let comment_user_id: Option<i64> =
+        sqlx::query_scalar("SELECT user_id FROM comments WHERE id = ?")
+            .bind(id)
+            .fetch_one(&pool)
+            .await
+            .ok();
 
     match comment_user_id {
         Some(user_id) if user_id != claims.user_id => {
-            return Err((StatusCode::FORBIDDEN, "Только автор может удалить комментарий".to_string()));
+            return Err((
+                StatusCode::FORBIDDEN,
+                "Только автор может удалить комментарий".to_string(),
+            ));
         }
         None => {
             return Err((StatusCode::NOT_FOUND, "Комментарий не найден".to_string()));

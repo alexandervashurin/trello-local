@@ -1,21 +1,23 @@
 use axum::{
-    extract::{Request, State, ConnectInfo},
-    http::{StatusCode, header},
+    extract::{ConnectInfo, Request, State},
+    http::{header, StatusCode},
     middleware::Next,
     response::Response,
 };
+use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use sqlx::SqlitePool;
-use jsonwebtoken::{decode, Validation, Algorithm, DecodingKey};
 
-use crate::views::Claims;
 use crate::controllers::sessions;
+use crate::views::Claims;
 
 /// Получение JWT secret из переменной окружения
 /// В production среде JWT_SECRET должен быть установлен обязательно
 fn get_jwt_secret() -> Vec<u8> {
     std::env::var("JWT_SECRET")
         .inspect_err(|_| {
-            tracing::warn!("JWT_SECRET не установлен! Используйте уникальное значение в production");
+            tracing::warn!(
+                "JWT_SECRET не установлен! Используйте уникальное значение в production"
+            );
         })
         .unwrap_or_else(|_| {
             // Генерируем случайный секрет только для разработки
@@ -45,17 +47,24 @@ pub async fn extract_claims(
         Some(header) => {
             // Ожидаем формат "Bearer <token>"
             if !header.starts_with("Bearer ") {
-                return Err((StatusCode::UNAUTHORIZED, "Неверный формат Authorization заголовка".to_string()));
+                return Err((
+                    StatusCode::UNAUTHORIZED,
+                    "Неверный формат Authorization заголовка".to_string(),
+                ));
             }
 
             let token = header.trim_start_matches("Bearer ").trim();
 
             // Проверяем сессию в БД
-            let session_valid = sessions::is_session_valid(&pool, token).await
+            let session_valid = sessions::is_session_valid(&pool, token)
+                .await
                 .unwrap_or(false);
 
             if !session_valid {
-                return Err((StatusCode::UNAUTHORIZED, "Сессия истекла или не найдена".to_string()));
+                return Err((
+                    StatusCode::UNAUTHORIZED,
+                    "Сессия истекла или не найдена".to_string(),
+                ));
             }
 
             match decode::<Claims>(
@@ -83,7 +92,8 @@ pub async fn extract_claims(
                         .and_then(|v| v.to_str().ok())
                         .map(|s| s.split(',').next().unwrap_or(s).trim().to_string())
                         .or_else(|| {
-                            request.extensions()
+                            request
+                                .extensions()
                                 .get::<ConnectInfo<std::net::SocketAddr>>()
                                 .map(|c| c.0.ip().to_string())
                         });
@@ -92,8 +102,13 @@ pub async fn extract_claims(
                     claims.ip_address = ip_address;
 
                     Some(claims)
-                },
-                Err(_) => return Err((StatusCode::UNAUTHORIZED, "Неверный или истёкший токен".to_string())),
+                }
+                Err(_) => {
+                    return Err((
+                        StatusCode::UNAUTHORIZED,
+                        "Неверный или истёкший токен".to_string(),
+                    ))
+                }
             }
         }
         None => None, // Токен не обязателен для некоторых эндпоинтов
@@ -113,14 +128,17 @@ pub async fn require_auth(
     request: Request,
     next: Next,
 ) -> Result<Response, (StatusCode, String)> {
-    let claims = request
-        .extensions()
-        .get::<Claims>()
-        .ok_or((StatusCode::UNAUTHORIZED, "Требуется аутентификация".to_string()))?;
+    let claims = request.extensions().get::<Claims>().ok_or((
+        StatusCode::UNAUTHORIZED,
+        "Требуется аутентификация".to_string(),
+    ))?;
 
     // Проверяем, что user_id валиден
     if claims.user_id <= 0 {
-        return Err((StatusCode::UNAUTHORIZED, "Неверный user_id в токене".to_string()));
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            "Неверный user_id в токене".to_string(),
+        ));
     }
 
     Ok(next.run(request).await)
@@ -133,8 +151,8 @@ pub fn get_claims_from_request(request: &Request) -> Option<&Claims> {
 
 /// Извлечение Claims из запроса с ошибкой если нет
 pub fn get_claims_or_unauthorized(request: &Request) -> Result<&Claims, (StatusCode, String)> {
-    request
-        .extensions()
-        .get::<Claims>()
-        .ok_or((StatusCode::UNAUTHORIZED, "Требуется аутентификация".to_string()))
+    request.extensions().get::<Claims>().ok_or((
+        StatusCode::UNAUTHORIZED,
+        "Требуется аутентификация".to_string(),
+    ))
 }

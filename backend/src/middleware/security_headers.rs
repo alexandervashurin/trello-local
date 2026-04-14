@@ -6,10 +6,7 @@ use axum::{
 };
 
 /// Middleware для добавления security заголовков
-pub async fn security_headers(
-    request: Request,
-    next: Next,
-) -> Result<Response, StatusCode> {
+pub async fn security_headers(request: Request, next: Next) -> Result<Response, StatusCode> {
     let mut response = next.run(request).await;
 
     let headers = response.headers_mut();
@@ -31,10 +28,7 @@ pub async fn security_headers(
     );
 
     // Запрет контента в iframe (защита от clickjacking)
-    headers.insert(
-        "X-Frame-Options",
-        HeaderValue::from_static("DENY"),
-    );
+    headers.insert("X-Frame-Options", HeaderValue::from_static("DENY"));
 
     // Защита от MIME-sniffing
     headers.insert(

@@ -1,12 +1,12 @@
+use crate::controllers::cards::get_board_id_by_card_id;
+use crate::models::card::CardVersionWithUser;
+use crate::views::Claims;
 use axum::{
-    extract::{Path, State, Extension},
+    extract::{Extension, Path, State},
     http::StatusCode,
     Json,
 };
 use sqlx::SqlitePool;
-use crate::models::card::{CardVersion, CardVersionWithUser};
-use crate::views::Claims;
-use crate::controllers::cards::get_board_id_by_card_id;
 
 /// Получить историю изменений карточки
 pub async fn get_card_history(
@@ -40,7 +40,20 @@ pub async fn get_card_history(
     }
 
     // Получаем историю изменений
-    let versions: Vec<(i64, i64, String, Option<String>, bool, Option<i64>, i64, i64, i64, String, String)> = sqlx::query_as(
+    #[allow(clippy::type_complexity)]
+    let versions: Vec<(
+        i64,
+        i64,
+        String,
+        Option<String>,
+        bool,
+        Option<i64>,
+        i64,
+        i64,
+        i64,
+        String,
+        String,
+    )> = sqlx::query_as(
         r#"
         SELECT 
             cv.id, cv.card_id, cv.title, cv.content, cv.done, cv.due_date,
@@ -58,8 +71,9 @@ pub async fn get_card_history(
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let result = versions.into_iter().map(|row| {
-        CardVersionWithUser {
+    let result = versions
+        .into_iter()
+        .map(|row| CardVersionWithUser {
             id: row.0,
             card_id: row.1,
             title: row.2,
@@ -71,8 +85,8 @@ pub async fn get_card_history(
             edited_at: row.8,
             change_summary: row.9,
             editor_username: row.10,
-        }
-    }).collect();
+        })
+        .collect();
 
     Ok(Json(result))
 }
@@ -85,12 +99,12 @@ pub async fn save_card_version(
     change_summary: &str,
 ) -> Result<(), sqlx::Error> {
     // Получаем текущие данные карточки
-    let card: Option<(String, Option<String>, bool, Option<i64>, i64)> = sqlx::query_as(
-        "SELECT title, content, done, due_date, list_id FROM cards WHERE id = ?",
-    )
-    .bind(card_id)
-    .fetch_optional(pool)
-    .await?;
+    #[allow(clippy::type_complexity)]
+    let card: Option<(String, Option<String>, bool, Option<i64>, i64)> =
+        sqlx::query_as("SELECT title, content, done, due_date, list_id FROM cards WHERE id = ?")
+            .bind(card_id)
+            .fetch_optional(pool)
+            .await?;
 
     if let Some((title, content, done, due_date, list_id)) = card {
         sqlx::query(
