@@ -542,7 +542,7 @@
         const res = await fetch('/api/auth/2fa/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code })
+          body: JSON.stringify({ code, temp_token: tempToken })
         });
 
         const data = await res.json();

@@ -94,6 +94,7 @@ pub struct TwoFASetup {
 #[derive(Deserialize, Debug)]
 pub struct TwoFACode {
     pub code: String,
+    pub temp_token: Option<String>,
 }
 
 /// Данные для включения/выключения 2FA

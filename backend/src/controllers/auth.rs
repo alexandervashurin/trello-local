@@ -463,12 +463,25 @@ pub async fn verify_2fa(
     Json(payload): Json<TwoFACode>,
 ) -> Result<Json<AuthToken>, (StatusCode, String)> {
     // Извлекаем user_id из временного токена
-    // В реальной реализации токен передается в заголовке
+    let user_id = if let Some(ref temp_token) = payload.temp_token {
+        match decode::<ClaimsWith2FA>(
+            temp_token,
+            &DecodingKey::from_secret(&get_jwt_secret()),
+            &Validation::new(Algorithm::HS256),
+        ) {
+            Ok(data) => data.claims.user_id,
+            Err(_) => {
+                return Err((StatusCode::UNAUTHORIZED, "Неверный временный токен".to_string()));
+            }
+        }
+    } else {
+        return Err((StatusCode::BAD_REQUEST, "Требуется temp_token".to_string()));
+    };
 
-    // Заглушка для демонстрации
     let user: User = sqlx::query_as::<_, User>(
-        "SELECT id, username, email, avatar_color, bio, last_login, created_at, two_factor_enabled, two_factor_secret FROM users WHERE id = 1",
+        "SELECT id, username, email, avatar_color, bio, last_login, created_at, two_factor_enabled, two_factor_secret FROM users WHERE id = ?",
     )
+    .bind(user_id)
     .fetch_one(&pool)
     .await
     .map_err(|_| (StatusCode::NOT_FOUND, "Пользователь не найден".to_string()))?;
