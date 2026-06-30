@@ -13,7 +13,7 @@ import {
 } from './modules/state.js';
 import { escapeHtml, formatDate, formatDateTime, formatRelativeTime, getInitials, getDueDateClass, getDueDateText } from './modules/utils.js';
 import { handleDragStart, handleDragOver, handleDrop, handleDragEnd } from './modules/drag-drop.js';
-import { startNotificationPolling, stopNotificationPolling, checkUnreadNotifications, loadNotifications, markAllNotificationsRead } from './modules/notifications.js';
+import { startNotificationPolling, stopNotificationPolling, checkUnreadNotifications, loadNotifications, markAllNotificationsRead, openNotificationsModal, closeNotificationsModal } from './modules/notifications.js';
 import { openProfileModal, closeProfileModal, saveProfile, openChangePassword, openDeleteAccount, setup2FA, confirm2FAEnable, disable2FA } from './modules/profile.js';
 import { loadSessions, deleteSession, deleteAllSessions, logoutAllSessions, openSessionsModal, closeSessionsModal } from './modules/sessions.js';
 import { exportBoardToJson, exportBoardToCsv, getBoardStats, closeBoardStats } from './modules/export.js';

@@ -79,6 +79,21 @@ export async function markAllNotificationsRead() {
   }
 }
 
+export function openNotificationsModal() {
+  const modal = document.getElementById('notifications-modal');
+  if (modal) {
+    modal.style.display = 'block';
+    loadNotifications();
+  }
+}
+
+export function closeNotificationsModal() {
+  const modal = document.getElementById('notifications-modal');
+  if (modal) {
+    modal.style.display = 'none';
+  }
+}
+
 function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
