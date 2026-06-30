@@ -4,6 +4,7 @@
 
 # База данных (опционально — если не хотите коммитить данные)
 /data/*.db
+**/data/*.db
 !/data/.gitkeep
 
 # Резервные копии
@@ -14,7 +15,11 @@
 .idea/
 *.swp
 *~
+.qwen/
 
 # Файлы окружения и сервисы
 .env
 backend/trello-backend.service
+
+# Бинарники
+backend/backend-release
