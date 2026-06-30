@@ -26,7 +26,7 @@ export function renderBoards(boards) {
     container.innerHTML = `
       <div class="empty-state">
         <p>Нет досок</p>
-        <button class="btn btn-primary" onclick="createBoard()">Создать первую доску</button>
+        <button class="btn btn-primary" onclick="window.createBoard()">Создать первую доску</button>
       </div>
     `;
     return;

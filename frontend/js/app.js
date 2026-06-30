@@ -19,6 +19,7 @@ import { loadSessions, deleteSession, deleteAllSessions, logoutAllSessions, open
 import { exportBoardToJson, exportBoardToCsv, getBoardStats, closeBoardStats } from './modules/export.js';
 import { toggleBulkModeFromModule, toggleCardSelectionFromModule, bulkMoveCards, bulkUpdateCards, bulkDeleteCards, bulkMarkDone, bulkMarkTodo } from './modules/bulk-ops.js';
 import { 
+  loadBoards, renderBoards, createBoard, openBoard, deleteBoard,
   loadBoardDetails, loadBoardLists, createList, deleteList, createCard,
   openCard, showCardModal, saveCardFromModal, closeCardModal
 } from './modules/boards.js';
@@ -258,86 +259,8 @@ if (searchInput) {
   loadBoards();
 })();
 
-// === Load Boards ===
-async function loadBoards() {
-  if (!isAuthenticated()) return;
-  
-  showLoading();
-  
-  try {
-    const boards = await apiRequest('/api/boards');
-    renderBoards(boards);
-  } catch (error) {
-    console.error(error);
-    showToast('Ошибка загрузки досок', 'error');
-  } finally {
-    hideLoading();
-  }
-}
-
-function renderBoards(boards) {
-  if (!boardsContainer) return;
-  
-  if (boards.length === 0) {
-    boardsContainer.innerHTML = `
-      <div class="empty-state">
-        <p>Нет досок</p>
-        <button class="btn btn-primary" onclick="createBoard()">Создать первую доску</button>
-      </div>
-    `;
-    return;
-  }
-  
-  boardsContainer.innerHTML = boards.map(board => `
-    <div class="board-card" data-board-id="${board.id}">
-      <div class="board-header">
-        <h3>${escapeHtml(board.title)}</h3>
-        <div class="board-actions">
-          <button class="btn btn-sm" onclick="openBoard(${board.id})">Открыть</button>
-          <button class="btn btn-sm btn-danger" onclick="deleteBoard(${board.id})">Удалить</button>
-        </div>
-      </div>
-      <div class="board-meta">
-        <span class="badge">${board.visibility === 'public' ? 'Публичная' : 'Приватная'}</span>
-        ${board.is_shared ? '<span class="badge badge-info">Общая</span>' : ''}
-      </div>
-    </div>
-  `).join('');
-}
-
-// === Board Actions ===
-async function createBoard() {
-  const title = prompt('Введите название доски:');
-  if (!title) return;
-  
-  try {
-    const board = await apiRequest('/api/boards', {
-      method: 'POST',
-      body: JSON.stringify({ title })
-    });
-    
-    showToast('Доска создана', 'success');
-    loadBoards();
-  } catch (error) {
-    console.error(error);
-    showToast('Ошибка создания доски', 'error');
-  }
-}
-
-async function openBoard(boardId) {
-  setCurrentBoardId(boardId);
-  window.location.href = `/?board=${boardId}`;
-}
-
-async function deleteBoard(boardId) {
-  if (!confirm('Удалить эту доску? Это действие необратимо.')) return;
-  
-  try {
-    await apiRequest(`/api/boards/${boardId}`, { method: 'DELETE' });
-    showToast('Доска удалена', 'success');
-    loadBoards();
-  } catch (error) {
-    console.error(error);
-    showToast('Ошибка удаления доски', 'error');
-  }
-}
+// Экспорт функций в глобальную область для inline onclick-обработчиков в HTML
+window.loadBoards = loadBoards;
+window.createBoard = createBoard;
+window.openBoard = openBoard;
+window.deleteBoard = deleteBoard;

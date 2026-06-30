@@ -21,7 +21,8 @@
       "Bash(mv *)",
       "Bash(find *)",
       "Bash(rm *)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(cargo *)"
     ]
   },
   "$version": 3
