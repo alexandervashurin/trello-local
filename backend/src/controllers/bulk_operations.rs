@@ -6,7 +6,7 @@ use axum::{
     Json,
 };
 use serde::Deserialize;
-use sqlx::SqlitePool;
+use sqlx::PgPool;
 
 /// Запрос массового перемещения
 #[derive(Deserialize)]
@@ -40,7 +40,7 @@ pub struct BulkOperationResult {
 
 /// Массовое перемещение карточек в другой список
 pub async fn bulk_move_cards(
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
     Json(payload): Json<BulkMoveRequest>,
 ) -> Result<Json<BulkOperationResult>, (StatusCode, String)> {
@@ -61,7 +61,7 @@ pub async fn bulk_move_cards(
 
         // Проверка доступа к доске
         let has_access: Option<(i64,)> = sqlx::query_as(
-            "SELECT 1 FROM boards WHERE id = ? AND (owner_id = ? OR visibility = 'public' OR EXISTS (SELECT 1 FROM board_members WHERE board_id = ? AND user_id = ?))",
+            "SELECT 1 FROM boards WHERE id = $1 AND (owner_id = $2 OR visibility = 'public' OR EXISTS (SELECT 1 FROM board_members WHERE board_id = $3 AND user_id = $4))",
         )
         .bind(board_id)
         .bind(claims.user_id)
@@ -78,7 +78,7 @@ pub async fn bulk_move_cards(
         }
 
         // Перемещение карточки
-        let result = sqlx::query("UPDATE cards SET list_id = ? WHERE id = ?")
+        let result = sqlx::query("UPDATE cards SET list_id = $1 WHERE id = $2")
             .bind(payload.list_id)
             .bind(card_id)
             .execute(&pool)
@@ -103,7 +103,7 @@ pub async fn bulk_move_cards(
 
 /// Массовое обновление карточек (статус, дедлайн)
 pub async fn bulk_update_cards(
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
     Json(payload): Json<BulkUpdateRequest>,
 ) -> Result<Json<BulkOperationResult>, (StatusCode, String)> {
@@ -124,7 +124,7 @@ pub async fn bulk_update_cards(
 
         // Проверка доступа к доске
         let has_access: Option<(i64,)> = sqlx::query_as(
-            "SELECT 1 FROM boards WHERE id = ? AND (owner_id = ? OR visibility = 'public' OR EXISTS (SELECT 1 FROM board_members WHERE board_id = ? AND user_id = ?))",
+            "SELECT 1 FROM boards WHERE id = $1 AND (owner_id = $2 OR visibility = 'public' OR EXISTS (SELECT 1 FROM board_members WHERE board_id = $3 AND user_id = $4))",
         )
         .bind(board_id)
         .bind(claims.user_id)
@@ -141,27 +141,40 @@ pub async fn bulk_update_cards(
         }
 
         // Построение динамического запроса
-        let mut updates = Vec::new();
+        let mut set_clauses = Vec::new();
+        let mut param_idx = 1;
+
         if let Some(done) = payload.done {
-            updates.push(format!("done = {}", if done { 1 } else { 0 }));
+            set_clauses.push(format!("done = ${}", param_idx));
+            param_idx += 1;
         }
         if let Some(due_date) = payload.due_date {
-            updates.push(format!("due_date = {}", due_date));
+            set_clauses.push(format!("due_date = ${}", param_idx));
+            param_idx += 1;
         }
 
-        if updates.is_empty() {
+        if set_clauses.is_empty() {
             failed += 1;
             errors.push(format!("Нет полей для обновления карточки {}", card_id));
             continue;
         }
 
         let query = format!(
-            "UPDATE cards SET {} WHERE id = {}",
-            updates.join(", "),
-            card_id
+            "UPDATE cards SET {} WHERE id = ${}",
+            set_clauses.join(", "),
+            param_idx,
         );
 
-        match sqlx::query(&query).execute(&pool).await {
+        let mut q = sqlx::query(&query);
+        if let Some(done) = payload.done {
+            q = q.bind(done);
+        }
+        if let Some(due_date) = payload.due_date {
+            q = q.bind(due_date);
+        }
+        q = q.bind(card_id);
+
+        match q.execute(&pool).await {
             Ok(_) => processed += 1,
             Err(e) => {
                 failed += 1;
@@ -180,7 +193,7 @@ pub async fn bulk_update_cards(
 
 /// Массовое удаление карточек
 pub async fn bulk_delete_cards(
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
     Json(payload): Json<BulkDeleteRequest>,
 ) -> Result<Json<BulkOperationResult>, (StatusCode, String)> {
@@ -201,7 +214,7 @@ pub async fn bulk_delete_cards(
 
         // Проверка доступа к доске
         let has_access: Option<(i64,)> = sqlx::query_as(
-            "SELECT 1 FROM boards WHERE id = ? AND (owner_id = ? OR visibility = 'public' OR EXISTS (SELECT 1 FROM board_members WHERE board_id = ? AND user_id = ?))",
+            "SELECT 1 FROM boards WHERE id = $1 AND (owner_id = $2 OR visibility = 'public' OR EXISTS (SELECT 1 FROM board_members WHERE board_id = $3 AND user_id = $4))",
         )
         .bind(board_id)
         .bind(claims.user_id)
@@ -218,7 +231,7 @@ pub async fn bulk_delete_cards(
         }
 
         // Удаление карточки
-        let result = sqlx::query("DELETE FROM cards WHERE id = ?")
+        let result = sqlx::query("DELETE FROM cards WHERE id = $1")
             .bind(card_id)
             .execute(&pool)
             .await;

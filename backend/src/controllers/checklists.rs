@@ -9,17 +9,17 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use sqlx::SqlitePool;
+use sqlx::PgPool;
 
 // === Checklist Functions ===
 
 /// Получить чек-листы карточки
 pub async fn get_card_checklists(
     Path(card_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
 ) -> Result<Json<Vec<ChecklistWithItems>>, (StatusCode, String)> {
     let checklists: Vec<Checklist> = sqlx::query_as(
-        "SELECT id, card_id, title, position, created_at FROM checklists WHERE card_id = ? ORDER BY position, id",
+        "SELECT id, card_id, title, position, created_at FROM checklists WHERE card_id = $1 ORDER BY position, id",
     )
     .bind(card_id)
     .fetch_all(&pool)
@@ -29,7 +29,7 @@ pub async fn get_card_checklists(
     let mut result = Vec::new();
     for checklist in checklists {
         let items: Vec<ChecklistItem> = sqlx::query_as(
-            "SELECT id, checklist_id, title, done, position, created_at FROM checklist_items WHERE checklist_id = ? ORDER BY position, id",
+            "SELECT id, checklist_id, title, done, position, created_at FROM checklist_items WHERE checklist_id = $1 ORDER BY position, id",
         )
         .bind(checklist.id)
         .fetch_all(&pool)
@@ -52,12 +52,12 @@ pub async fn get_card_checklists(
 /// Создать чек-лист
 pub async fn create_checklist(
     Path(card_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
     Json(payload): Json<CreateChecklist>,
 ) -> Result<Json<Checklist>, (StatusCode, String)> {
     let checklist: Checklist = sqlx::query_as::<_, Checklist>(
-        "INSERT INTO checklists (card_id, title, position) VALUES (?, ?, (SELECT COALESCE(MAX(position), -1) + 1 FROM checklists WHERE card_id = ?)) RETURNING id, card_id, title, position, created_at",
+        "INSERT INTO checklists (card_id, title, position) VALUES ($1, $2, (SELECT COALESCE(MAX(position), -1) + 1 FROM checklists WHERE card_id = $3)) RETURNING id, card_id, title, position, created_at",
     )
     .bind(card_id)
     .bind(&payload.title)
@@ -87,11 +87,11 @@ pub async fn create_checklist(
 /// Удалить чек-лист
 pub async fn delete_checklist(
     Path((card_id, checklist_id)): Path<(i64, i64)>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<()>, (StatusCode, String)> {
     let checklist_title: Option<(String,)> =
-        sqlx::query_as("SELECT title FROM checklists WHERE id = ? AND card_id = ?")
+        sqlx::query_as("SELECT title FROM checklists WHERE id = $1 AND card_id = $2")
             .bind(checklist_id)
             .bind(card_id)
             .fetch_optional(&pool)
@@ -102,7 +102,7 @@ pub async fn delete_checklist(
         .map(|t| t.0)
         .unwrap_or_else(|| "неизвестно".to_string());
 
-    let result = sqlx::query("DELETE FROM checklists WHERE id = ? AND card_id = ?")
+    let result = sqlx::query("DELETE FROM checklists WHERE id = $1 AND card_id = $2")
         .bind(checklist_id)
         .bind(card_id)
         .execute(&pool)
@@ -133,12 +133,12 @@ pub async fn delete_checklist(
 /// Добавить элемент в чек-лист
 pub async fn create_checklist_item(
     Path((card_id, checklist_id)): Path<(i64, i64)>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
     Json(payload): Json<CreateChecklistItem>,
 ) -> Result<Json<ChecklistItem>, (StatusCode, String)> {
     let item: ChecklistItem = sqlx::query_as::<_, ChecklistItem>(
-        "INSERT INTO checklist_items (checklist_id, title, position) VALUES (?, ?, (SELECT COALESCE(MAX(position), -1) + 1 FROM checklist_items WHERE checklist_id = ?)) RETURNING id, checklist_id, title, done, position, created_at",
+        "INSERT INTO checklist_items (checklist_id, title, position) VALUES ($1, $2, (SELECT COALESCE(MAX(position), -1) + 1 FROM checklist_items WHERE checklist_id = $3)) RETURNING id, checklist_id, title, done, position, created_at",
     )
     .bind(checklist_id)
     .bind(&payload.title)
@@ -168,12 +168,12 @@ pub async fn create_checklist_item(
 /// Обновить элемент чек-листа
 pub async fn update_checklist_item(
     Path((card_id, checklist_id, item_id)): Path<(i64, i64, i64)>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
     Json(payload): Json<UpdateChecklistItem>,
 ) -> Result<Json<ChecklistItem>, (StatusCode, String)> {
     let current: ChecklistItem = sqlx::query_as::<_, ChecklistItem>(
-        "SELECT id, checklist_id, title, done, position, created_at FROM checklist_items WHERE id = ? AND checklist_id = ?",
+        "SELECT id, checklist_id, title, done, position, created_at FROM checklist_items WHERE id = $1 AND checklist_id = $2",
     )
     .bind(item_id)
     .bind(checklist_id)
@@ -186,7 +186,7 @@ pub async fn update_checklist_item(
     let new_done = payload.done.unwrap_or(current.done);
 
     let updated: ChecklistItem = sqlx::query_as(
-        "UPDATE checklist_items SET title = ?, done = ? WHERE id = ? RETURNING id, checklist_id, title, done, position, created_at",
+        "UPDATE checklist_items SET title = $1, done = $2 WHERE id = $3 RETURNING id, checklist_id, title, done, position, created_at",
     )
     .bind(&new_title)
     .bind(new_done)
@@ -233,11 +233,11 @@ pub async fn update_checklist_item(
 /// Удалить элемент чек-листа
 pub async fn delete_checklist_item(
     Path((card_id, checklist_id, item_id)): Path<(i64, i64, i64)>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<()>, (StatusCode, String)> {
     let item_title: Option<(String,)> =
-        sqlx::query_as("SELECT title FROM checklist_items WHERE id = ? AND checklist_id = ?")
+        sqlx::query_as("SELECT title FROM checklist_items WHERE id = $1 AND checklist_id = $2")
             .bind(item_id)
             .bind(checklist_id)
             .fetch_optional(&pool)
@@ -248,7 +248,7 @@ pub async fn delete_checklist_item(
         .map(|t| t.0)
         .unwrap_or_else(|| "неизвестно".to_string());
 
-    let result = sqlx::query("DELETE FROM checklist_items WHERE id = ? AND checklist_id = ?")
+    let result = sqlx::query("DELETE FROM checklist_items WHERE id = $1 AND checklist_id = $2")
         .bind(item_id)
         .bind(checklist_id)
         .execute(&pool)
@@ -284,10 +284,10 @@ pub async fn delete_checklist_item(
 /// Получить исполнителей карточки
 pub async fn get_card_assignees(
     Path(card_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
 ) -> Result<Json<Vec<CardAssigneeWithUser>>, (StatusCode, String)> {
     let rows: Vec<(i64, i64, i64, i64, String)> = sqlx::query_as(
-        "SELECT ca.card_id, ca.user_id, ca.assigned_at, ca.assigned_by, u.username FROM card_assignees ca INNER JOIN users u ON ca.user_id = u.id WHERE ca.card_id = ?",
+        "SELECT ca.card_id, ca.user_id, ca.assigned_at, ca.assigned_by, u.username FROM card_assignees ca INNER JOIN users u ON ca.user_id = u.id WHERE ca.card_id = $1",
     )
     .bind(card_id)
     .fetch_all(&pool)
@@ -311,7 +311,7 @@ pub async fn get_card_assignees(
 /// Добавить исполнителя на карточку
 pub async fn add_card_assignee(
     Path(card_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
     Json(payload): Json<AddCardAssignee>,
 ) -> Result<Json<()>, (StatusCode, String)> {
@@ -321,7 +321,7 @@ pub async fn add_card_assignee(
         .as_secs() as i64;
 
     let result = sqlx::query(
-        "INSERT OR REPLACE INTO card_assignees (card_id, user_id, assigned_at, assigned_by) VALUES (?, ?, ?, ?)",
+        "INSERT INTO card_assignees (card_id, user_id, assigned_at, assigned_by) VALUES ($1, $2, $3, $4) ON CONFLICT (card_id, user_id) DO UPDATE SET assigned_at = EXCLUDED.assigned_at, assigned_by = EXCLUDED.assigned_by",
     )
     .bind(card_id)
     .bind(payload.user_id)
@@ -340,7 +340,7 @@ pub async fn add_card_assignee(
         // Логирование
         if let Some(board_id) = get_board_id_by_card_id(&pool, card_id).await {
             let username: Option<(String,)> =
-                sqlx::query_as("SELECT username FROM users WHERE id = ?")
+                sqlx::query_as("SELECT username FROM users WHERE id = $1")
                     .bind(payload.user_id)
                     .fetch_optional(&pool)
                     .await
@@ -370,10 +370,10 @@ pub async fn add_card_assignee(
 /// Удалить исполнителя с карточки
 pub async fn remove_card_assignee(
     Path((card_id, user_id)): Path<(i64, i64)>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<()>, (StatusCode, String)> {
-    let result = sqlx::query("DELETE FROM card_assignees WHERE card_id = ? AND user_id = ?")
+    let result = sqlx::query("DELETE FROM card_assignees WHERE card_id = $1 AND user_id = $2")
         .bind(card_id)
         .bind(user_id)
         .execute(&pool)

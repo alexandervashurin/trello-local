@@ -7,11 +7,11 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use sqlx::SqlitePool;
+use sqlx::PgPool;
 
 /// Вспомогательная функция для получения board_id по list_id
-async fn get_board_id_by_list_id(pool: &SqlitePool, list_id: i64) -> Option<i64> {
-    let result: Option<(i64,)> = sqlx::query_as("SELECT board_id FROM lists WHERE id = ?")
+async fn get_board_id_by_list_id(pool: &PgPool, list_id: i64) -> Option<i64> {
+    let result: Option<(i64,)> = sqlx::query_as("SELECT board_id FROM lists WHERE id = $1")
         .bind(list_id)
         .fetch_optional(pool)
         .await
@@ -23,10 +23,10 @@ async fn get_board_id_by_list_id(pool: &SqlitePool, list_id: i64) -> Option<i64>
 /// Получить одну карточку
 pub async fn get_card(
     Path(id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
 ) -> Result<Json<Card>, (StatusCode, String)> {
     let card: Card = sqlx::query_as::<_, Card>(
-        "SELECT id, list_id, title, content, done, due_date FROM cards WHERE id = ?",
+        "SELECT id, list_id, title, content, done, due_date FROM cards WHERE id = $1",
     )
     .bind(id)
     .fetch_one(&pool)
@@ -45,7 +45,7 @@ pub async fn get_card(
 /// Создать карточку в списке
 pub async fn create_card(
     Path(list_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Json(payload): Json<CreateCard>,
 ) -> Result<Json<Card>, (StatusCode, String)> {
     // Валидация названия
@@ -68,7 +68,7 @@ pub async fn create_card(
         .ok_or((StatusCode::NOT_FOUND, "Список не найден".to_string()))?;
 
     let card: Card = sqlx::query_as::<_, Card>(
-        "INSERT INTO cards (list_id, title, content, done, due_date) VALUES (?, ?, ?, 0, ?) RETURNING id, list_id, title, content, done, due_date",
+        "INSERT INTO cards (list_id, title, content, done, due_date) VALUES ($1, $2, $3, FALSE, $4) RETURNING id, list_id, title, content, done, due_date",
     )
     .bind(list_id)
     .bind(&payload.title)
@@ -97,12 +97,12 @@ pub async fn create_card(
 /// Обновить карточку
 pub async fn update_card(
     Path(id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
     Json(payload): Json<UpdateCard>,
 ) -> Result<Json<Card>, (StatusCode, String)> {
     let current: Card = sqlx::query_as::<_, Card>(
-        "SELECT id, list_id, title, content, done, due_date FROM cards WHERE id = ?",
+        "SELECT id, list_id, title, content, done, due_date FROM cards WHERE id = $1",
     )
     .bind(id)
     .fetch_one(&pool)
@@ -127,7 +127,7 @@ pub async fn update_card(
         .ok_or((StatusCode::NOT_FOUND, "Доска не найдена".to_string()))?;
 
     let updated: Card = sqlx::query_as(
-        "UPDATE cards SET title = ?, content = ?, list_id = ?, done = ?, due_date = ? WHERE id = ? RETURNING id, list_id, title, content, done, due_date"
+        "UPDATE cards SET title = $1, content = $2, list_id = $3, done = $4, due_date = $5 WHERE id = $6 RETURNING id, list_id, title, content, done, due_date"
     )
     .bind(&new_title)
     .bind(&new_content)
@@ -191,11 +191,11 @@ pub async fn update_card(
 /// Удалить карточку
 pub async fn delete_card(
     Path(id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
 ) -> Result<Json<()>, (StatusCode, String)> {
     // Получаем информацию о карточке перед удалением
     let card: Option<(String, i64)> =
-        sqlx::query_as("SELECT title, list_id FROM cards WHERE id = ?")
+        sqlx::query_as("SELECT title, list_id FROM cards WHERE id = $1")
             .bind(id)
             .fetch_optional(&pool)
             .await
@@ -209,7 +209,7 @@ pub async fn delete_card(
         .await
         .ok_or((StatusCode::NOT_FOUND, "Доска не найдена".to_string()))?;
 
-    let result = sqlx::query("DELETE FROM cards WHERE id = ?")
+    let result = sqlx::query("DELETE FROM cards WHERE id = $1")
         .bind(id)
         .execute(&pool)
         .await
@@ -235,9 +235,9 @@ pub async fn delete_card(
 }
 
 /// Вспомогательная функция для получения board_id по card_id
-pub async fn get_board_id_by_card_id(pool: &SqlitePool, card_id: i64) -> Option<i64> {
+pub async fn get_board_id_by_card_id(pool: &PgPool, card_id: i64) -> Option<i64> {
     let result: Option<(i64,)> = sqlx::query_as(
-        "SELECT b.id FROM boards b INNER JOIN lists l ON b.id = l.board_id INNER JOIN cards c ON l.id = c.list_id WHERE c.id = ?"
+        "SELECT b.id FROM boards b INNER JOIN lists l ON b.id = l.board_id INNER JOIN cards c ON l.id = c.list_id WHERE c.id = $1"
     )
     .bind(card_id)
     .fetch_optional(pool)
@@ -250,10 +250,10 @@ pub async fn get_board_id_by_card_id(pool: &SqlitePool, card_id: i64) -> Option<
 /// Получить метки карточки
 pub async fn get_card_labels(
     Path(card_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
 ) -> Result<Json<Vec<Label>>, (StatusCode, String)> {
     let labels: Vec<Label> =
-        sqlx::query_as("SELECT id, card_id, name, color FROM labels WHERE card_id = ?")
+        sqlx::query_as("SELECT id, card_id, name, color FROM labels WHERE card_id = $1")
             .bind(card_id)
             .fetch_all(&pool)
             .await
@@ -265,13 +265,13 @@ pub async fn get_card_labels(
 /// Добавить метку к карточке
 pub async fn create_label(
     Path(card_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Json(payload): Json<CreateLabel>,
 ) -> Result<Json<Label>, (StatusCode, String)> {
     let color = payload.color.unwrap_or_else(|| "blue".to_string());
 
     let label: Label = sqlx::query_as::<_, Label>(
-        "INSERT INTO labels (card_id, name, color) VALUES (?, ?, ?) RETURNING id, card_id, name, color",
+        "INSERT INTO labels (card_id, name, color) VALUES ($1, $2, $3) RETURNING id, card_id, name, color",
     )
     .bind(card_id)
     .bind(&payload.name)
@@ -301,11 +301,11 @@ pub async fn create_label(
 /// Обновить метку
 pub async fn update_label(
     Path((card_id, label_id)): Path<(i64, i64)>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Json(payload): Json<UpdateLabel>,
 ) -> Result<Json<Label>, (StatusCode, String)> {
     let current: Label = sqlx::query_as::<_, Label>(
-        "SELECT id, card_id, name, color FROM labels WHERE id = ? AND card_id = ?",
+        "SELECT id, card_id, name, color FROM labels WHERE id = $1 AND card_id = $2",
     )
     .bind(label_id)
     .bind(card_id)
@@ -317,7 +317,7 @@ pub async fn update_label(
     let new_color = payload.color.clone().unwrap_or(current.color.clone());
 
     let updated: Label = sqlx::query_as(
-        "UPDATE labels SET name = ?, color = ? WHERE id = ? RETURNING id, card_id, name, color",
+        "UPDATE labels SET name = $1, color = $2 WHERE id = $3 RETURNING id, card_id, name, color",
     )
     .bind(&new_name)
     .bind(&new_color)
@@ -356,11 +356,11 @@ pub async fn update_label(
 /// Удалить метку
 pub async fn delete_label(
     Path((card_id, label_id)): Path<(i64, i64)>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
 ) -> Result<Json<()>, (StatusCode, String)> {
     // Получаем название метки перед удалением
     let label_name: Option<(String,)> =
-        sqlx::query_as("SELECT name FROM labels WHERE id = ? AND card_id = ?")
+        sqlx::query_as("SELECT name FROM labels WHERE id = $1 AND card_id = $2")
             .bind(label_id)
             .bind(card_id)
             .fetch_optional(&pool)
@@ -371,7 +371,7 @@ pub async fn delete_label(
         .map(|l| l.0)
         .unwrap_or_else(|| "неизвестно".to_string());
 
-    let result = sqlx::query("DELETE FROM labels WHERE id = ? AND card_id = ?")
+    let result = sqlx::query("DELETE FROM labels WHERE id = $1 AND card_id = $2")
         .bind(label_id)
         .bind(card_id)
         .execute(&pool)
@@ -402,10 +402,10 @@ pub async fn delete_label(
 /// Получить вложения карточки
 pub async fn get_card_attachments(
     Path(card_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
 ) -> Result<Json<Vec<Attachment>>, (StatusCode, String)> {
     let attachments: Vec<Attachment> = sqlx::query_as(
-        "SELECT id, card_id, user_id, filename, file_path, file_size, mime_type, created_at FROM attachments WHERE card_id = ? ORDER BY created_at DESC"
+        "SELECT id, card_id, user_id, filename, file_path, file_size, mime_type, created_at FROM attachments WHERE card_id = $1 ORDER BY created_at DESC"
     )
     .bind(card_id)
     .fetch_all(&pool)
@@ -418,11 +418,11 @@ pub async fn get_card_attachments(
 /// Удалить вложение
 pub async fn delete_attachment(
     Path((card_id, attachment_id)): Path<(i64, i64)>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
 ) -> Result<Json<()>, (StatusCode, String)> {
     // Сначала получаем путь к файлу
     let attachment: Attachment = sqlx::query_as::<_, Attachment>(
-        "SELECT id, card_id, user_id, filename, file_path, file_size, mime_type, created_at FROM attachments WHERE id = ? AND card_id = ?"
+        "SELECT id, card_id, user_id, filename, file_path, file_size, mime_type, created_at FROM attachments WHERE id = $1 AND card_id = $2"
     )
     .bind(attachment_id)
     .bind(card_id)
@@ -436,7 +436,7 @@ pub async fn delete_attachment(
     let _ = std::fs::remove_file(&attachment.file_path);
 
     // Удаляем запись из БД
-    let result = sqlx::query("DELETE FROM attachments WHERE id = ? AND card_id = ?")
+    let result = sqlx::query("DELETE FROM attachments WHERE id = $1 AND card_id = $2")
         .bind(attachment_id)
         .bind(card_id)
         .execute(&pool)
@@ -467,10 +467,10 @@ pub async fn delete_attachment(
 /// Получить историю активности доски
 pub async fn get_activity_log(
     Path(board_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
 ) -> Result<Json<Vec<ActivityLog>>, (StatusCode, String)> {
     let activities: Vec<ActivityLog> = sqlx::query_as(
-        "SELECT id, board_id, user_id, action_type, entity_type, entity_id, description, metadata, created_at FROM activity_log WHERE board_id = ? ORDER BY created_at DESC LIMIT 100"
+        "SELECT id, board_id, user_id, action_type, entity_type, entity_id, description, metadata, created_at FROM activity_log WHERE board_id = $1 ORDER BY created_at DESC LIMIT 100"
     )
     .bind(board_id)
     .fetch_all(&pool)
@@ -483,7 +483,7 @@ pub async fn get_activity_log(
 /// Вспомогательная функция для логирования действий
 #[allow(clippy::too_many_arguments)]
 pub async fn log_activity(
-    pool: &SqlitePool,
+    pool: &PgPool,
     board_id: i64,
     user_id: Option<i64>,
     action_type: &str,
@@ -493,7 +493,7 @@ pub async fn log_activity(
     metadata: Option<&str>,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO activity_log (board_id, user_id, action_type, entity_type, entity_id, description, metadata) VALUES (?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO activity_log (board_id, user_id, action_type, entity_type, entity_id, description, metadata) VALUES ($1, $2, $3, $4, $5, $6, $7)"
     )
     .bind(board_id)
     .bind(user_id)

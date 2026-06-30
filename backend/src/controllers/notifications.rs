@@ -6,7 +6,7 @@ use axum::{
     Json,
 };
 use serde::Deserialize;
-use sqlx::SqlitePool;
+use sqlx::PgPool;
 
 /// Параметры запроса уведомлений
 #[derive(Deserialize)]
@@ -17,7 +17,7 @@ pub struct NotificationQuery {
 
 /// Получить уведомления текущего пользователя
 pub async fn get_notifications(
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
     Query(query): Query<NotificationQuery>,
 ) -> Result<Json<Vec<Notification>>, (StatusCode, String)> {
@@ -25,7 +25,7 @@ pub async fn get_notifications(
 
     let notifications: Vec<Notification> = if query.unread_only.unwrap_or(false) {
         sqlx::query_as(
-            "SELECT id, user_id, title, message, notification_type, is_read, created_at, link FROM notifications WHERE user_id = ? AND is_read = 0 ORDER BY created_at DESC LIMIT ?",
+            "SELECT id, user_id, title, message, notification_type, is_read, created_at, link FROM notifications WHERE user_id = $1 AND is_read = FALSE ORDER BY created_at DESC LIMIT $2",
         )
         .bind(claims.user_id)
         .bind(limit)
@@ -34,7 +34,7 @@ pub async fn get_notifications(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
     } else {
         sqlx::query_as(
-            "SELECT id, user_id, title, message, notification_type, is_read, created_at, link FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
+            "SELECT id, user_id, title, message, notification_type, is_read, created_at, link FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2",
         )
         .bind(claims.user_id)
         .bind(limit)
@@ -48,7 +48,7 @@ pub async fn get_notifications(
 
 /// Создать уведомление (для внутренних нужд системы)
 pub async fn create_notification(
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
     Json(payload): Json<CreateNotification>,
 ) -> Result<Json<Notification>, (StatusCode, String)> {
@@ -57,7 +57,7 @@ pub async fn create_notification(
         .unwrap_or_else(|| "info".to_string());
 
     let notification: Notification = sqlx::query_as(
-        "INSERT INTO notifications (user_id, title, message, notification_type, link) VALUES (?, ?, ?, ?, ?) RETURNING *",
+        "INSERT INTO notifications (user_id, title, message, notification_type, link) VALUES ($1, $2, $3, $4, $5) RETURNING *",
     )
     .bind(claims.user_id)
     .bind(&payload.title)
@@ -74,10 +74,10 @@ pub async fn create_notification(
 /// Отметить уведомление как прочитанное
 pub async fn mark_notification_read(
     Path(notification_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<()>, (StatusCode, String)> {
-    let result = sqlx::query("UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?")
+    let result = sqlx::query("UPDATE notifications SET is_read = TRUE WHERE id = $1 AND user_id = $2")
         .bind(notification_id)
         .bind(claims.user_id)
         .execute(&pool)
@@ -93,10 +93,10 @@ pub async fn mark_notification_read(
 
 /// Отметить все уведомления как прочитанные
 pub async fn mark_all_read(
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<()>, (StatusCode, String)> {
-    sqlx::query("UPDATE notifications SET is_read = 1 WHERE user_id = ?")
+    sqlx::query("UPDATE notifications SET is_read = TRUE WHERE user_id = $1")
         .bind(claims.user_id)
         .execute(&pool)
         .await
@@ -108,10 +108,10 @@ pub async fn mark_all_read(
 /// Удалить уведомление
 pub async fn delete_notification(
     Path(notification_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<()>, (StatusCode, String)> {
-    let result = sqlx::query("DELETE FROM notifications WHERE id = ? AND user_id = ?")
+    let result = sqlx::query("DELETE FROM notifications WHERE id = $1 AND user_id = $2")
         .bind(notification_id)
         .bind(claims.user_id)
         .execute(&pool)
@@ -127,11 +127,11 @@ pub async fn delete_notification(
 
 /// Получить количество непрочитанных уведомлений
 pub async fn get_unread_count(
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<i64>, (StatusCode, String)> {
     let count: (i64,) =
-        sqlx::query_as("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0")
+        sqlx::query_as("SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND is_read = FALSE")
             .bind(claims.user_id)
             .fetch_one(&pool)
             .await
@@ -142,7 +142,7 @@ pub async fn get_unread_count(
 
 /// Создать системное уведомление (внутренняя функция)
 pub async fn create_system_notification(
-    pool: &SqlitePool,
+    pool: &PgPool,
     user_id: i64,
     title: &str,
     message: &str,
@@ -150,7 +150,7 @@ pub async fn create_system_notification(
     link: Option<&str>,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO notifications (user_id, title, message, notification_type, link) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO notifications (user_id, title, message, notification_type, link) VALUES ($1, $2, $3, $4, $5)",
     )
     .bind(user_id)
     .bind(title)

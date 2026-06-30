@@ -9,7 +9,7 @@ use axum::{
 };
 use chrono::Utc;
 use serde::Serialize;
-use sqlx::SqlitePool;
+use sqlx::PgPool;
 
 /// Данные для экспорта доски
 #[derive(Serialize)]
@@ -50,7 +50,7 @@ pub struct LabelExport {
 /// Экспорт доски в JSON
 pub async fn export_board_json(
     Path(board_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Response, (StatusCode, String)> {
     let board_data = get_board_export_data(&pool, board_id, claims.user_id).await?;
@@ -81,7 +81,7 @@ pub async fn export_board_json(
 /// Экспорт доски в CSV
 pub async fn export_board_csv(
     Path(board_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Response, (StatusCode, String)> {
     let board_data = get_board_export_data(&pool, board_id, claims.user_id).await?;
@@ -152,13 +152,13 @@ pub async fn export_board_csv(
 
 /// Получить данные для экспорта доски
 async fn get_board_export_data(
-    pool: &SqlitePool,
+    pool: &PgPool,
     board_id: i64,
     user_id: i64,
 ) -> Result<BoardExport, (StatusCode, String)> {
     // Проверка прав доступа
     let board: Board = sqlx::query_as::<_, Board>(
-        "SELECT * FROM boards WHERE id = ? AND (owner_id = ? OR visibility = 'public' OR EXISTS (SELECT 1 FROM board_members WHERE board_id = boards.id AND user_id = ?))",
+        "SELECT * FROM boards WHERE id = $1 AND (owner_id = $2 OR visibility = 'public' OR EXISTS (SELECT 1 FROM board_members WHERE board_id = boards.id AND user_id = $3))",
     )
     .bind(board_id)
     .bind(user_id)
@@ -169,7 +169,7 @@ async fn get_board_export_data(
 
     // Загружаем списки
     let lists: Vec<List> = sqlx::query_as(
-        "SELECT id, board_id, title, position FROM lists WHERE board_id = ? ORDER BY position, id",
+        "SELECT id, board_id, title, position FROM lists WHERE board_id = $1 ORDER BY position, id",
     )
     .bind(board_id)
     .fetch_all(pool)
@@ -180,7 +180,7 @@ async fn get_board_export_data(
     let mut list_exports = Vec::new();
     for list in lists {
         let cards: Vec<Card> = sqlx::query_as(
-            "SELECT id, list_id, title, content, done, due_date, position FROM cards WHERE list_id = ? ORDER BY position, id",
+            "SELECT id, list_id, title, content, done, due_date, position FROM cards WHERE list_id = $1 ORDER BY position, id",
         )
         .bind(list.id)
         .fetch_all(pool)
@@ -190,7 +190,7 @@ async fn get_board_export_data(
         let mut card_exports = Vec::new();
         for card in cards {
             let labels: Vec<Label> =
-                sqlx::query_as("SELECT id, card_id, name, color FROM labels WHERE card_id = ?")
+                sqlx::query_as("SELECT id, card_id, name, color FROM labels WHERE card_id = $1")
                     .bind(card.id)
                     .fetch_all(pool)
                     .await
@@ -249,12 +249,12 @@ pub struct BoardStats {
 /// Получить статистику по доске
 pub async fn get_board_stats(
     Path(board_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<BoardStats>, (StatusCode, String)> {
     // Проверка прав доступа
     let board: Board = sqlx::query_as::<_, Board>(
-        "SELECT * FROM boards WHERE id = ? AND (owner_id = ? OR visibility = 'public' OR EXISTS (SELECT 1 FROM board_members WHERE board_id = boards.id AND user_id = ?))",
+        "SELECT * FROM boards WHERE id = $1 AND (owner_id = $2 OR visibility = 'public' OR EXISTS (SELECT 1 FROM board_members WHERE board_id = boards.id AND user_id = $3))",
     )
     .bind(board_id)
     .bind(claims.user_id)
@@ -269,19 +269,14 @@ pub async fn get_board_stats(
     let stats: (i64, i64, i64, i64, i64, i64) = sqlx::query_as(
         r#"
         SELECT 
-            (SELECT COUNT(*) FROM lists WHERE board_id = ?) as total_lists,
-            (SELECT COUNT(*) FROM cards c INNER JOIN lists l ON c.list_id = l.id WHERE l.board_id = ?) as total_cards,
-            (SELECT COUNT(*) FROM cards c INNER JOIN lists l ON c.list_id = l.id WHERE l.board_id = ? AND c.done = 1) as completed_cards,
-            (SELECT COUNT(*) FROM cards c INNER JOIN lists l ON c.list_id = l.id WHERE l.board_id = ? AND c.done = 0) as pending_cards,
-            (SELECT COUNT(*) FROM labels l INNER JOIN cards c ON l.card_id = c.id INNER JOIN lists li ON c.list_id = li.id WHERE li.board_id = ?) as total_labels,
-            (SELECT COUNT(*) FROM cards c INNER JOIN lists l ON c.list_id = l.id WHERE l.board_id = ? AND c.due_date IS NOT NULL) as cards_with_due_date
+            (SELECT COUNT(*) FROM lists WHERE board_id = $1) as total_lists,
+            (SELECT COUNT(*) FROM cards c INNER JOIN lists l ON c.list_id = l.id WHERE l.board_id = $1) as total_cards,
+            (SELECT COUNT(*) FROM cards c INNER JOIN lists l ON c.list_id = l.id WHERE l.board_id = $1 AND c.done = TRUE) as completed_cards,
+            (SELECT COUNT(*) FROM cards c INNER JOIN lists l ON c.list_id = l.id WHERE l.board_id = $1 AND c.done = FALSE) as pending_cards,
+            (SELECT COUNT(*) FROM labels l INNER JOIN cards c ON l.card_id = c.id INNER JOIN lists li ON c.list_id = li.id WHERE li.board_id = $1) as total_labels,
+            (SELECT COUNT(*) FROM cards c INNER JOIN lists l ON c.list_id = l.id WHERE l.board_id = $1 AND c.due_date IS NOT NULL) as cards_with_due_date
         "#,
     )
-    .bind(board_id)
-    .bind(board_id)
-    .bind(board_id)
-    .bind(board_id)
-    .bind(board_id)
     .bind(board_id)
     .fetch_one(&pool)
     .await
@@ -292,7 +287,7 @@ pub async fn get_board_stats(
         r#"
         SELECT COUNT(*) FROM cards c 
         INNER JOIN lists l ON c.list_id = l.id 
-        WHERE l.board_id = ? AND c.due_date IS NOT NULL AND c.due_date < ? AND c.done = 0
+        WHERE l.board_id = $1 AND c.due_date IS NOT NULL AND c.due_date < $2 AND c.done = FALSE
         "#,
     )
     .bind(board_id)

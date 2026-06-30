@@ -5,7 +5,7 @@ use axum::{
     Json,
 };
 use chrono::Utc;
-use sqlx::SqlitePool;
+use sqlx::PgPool;
 use std::path::PathBuf;
 
 /// Максимальный размер загружаемого файла (10 MB)
@@ -31,7 +31,7 @@ const ALLOWED_MIME_TYPES: &[&str] = &[
 /// Загрузить файл к карточке
 pub async fn upload_attachment(
     Path((card_id, _board_id)): Path<(i64, i64)>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     mut multipart: Multipart,
 ) -> Result<Json<Attachment>, (StatusCode, String)> {
     let user_id = 1; // По умолчанию первый пользователь
@@ -116,7 +116,7 @@ pub async fn upload_attachment(
 
     // Сохраняем запись в БД
     let attachment: Attachment = sqlx::query_as::<_, Attachment>(
-        "INSERT INTO attachments (card_id, user_id, filename, file_path, file_size, mime_type) VALUES (?, ?, ?, ?, ?, ?) RETURNING id, card_id, user_id, filename, file_path, file_size, mime_type, created_at"
+        "INSERT INTO attachments (card_id, user_id, filename, file_path, file_size, mime_type) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, card_id, user_id, filename, file_path, file_size, mime_type, created_at"
     )
     .bind(card_id)
     .bind(user_id)
@@ -134,10 +134,10 @@ pub async fn upload_attachment(
 /// Скачать файл
 pub async fn download_attachment(
     Path(attachment_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
 ) -> Result<axum::response::Response, (StatusCode, String)> {
     let attachment: Attachment = sqlx::query_as::<_, Attachment>(
-        "SELECT id, card_id, user_id, filename, file_path, file_size, mime_type, created_at FROM attachments WHERE id = ?"
+        "SELECT id, card_id, user_id, filename, file_path, file_size, mime_type, created_at FROM attachments WHERE id = $1"
     )
     .bind(attachment_id)
     .fetch_one(&pool)

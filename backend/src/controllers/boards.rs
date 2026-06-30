@@ -11,7 +11,7 @@ use axum::{
 };
 use axum_macros::debug_handler;
 use serde::Deserialize;
-use sqlx::SqlitePool;
+use sqlx::PgPool;
 
 /// Получить базовый URL сервера из переменной окружения или использовать localhost
 fn get_server_url() -> String {
@@ -26,7 +26,7 @@ pub struct GetBoardsQuery {
 /// Получить все доски (с опциональным поиском)
 #[debug_handler]
 pub async fn get_boards(
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     query: Query<GetBoardsQuery>,
     claims: Option<Extension<Claims>>,
 ) -> Result<Json<Vec<BoardView>>, (StatusCode, String)> {
@@ -34,7 +34,7 @@ pub async fn get_boards(
     let current_user_id = claims.map(|c| c.user_id);
 
     let boards: Vec<Board> = if let Some(search) = &query.search {
-        sqlx::query_as("SELECT * FROM boards WHERE title LIKE ? ORDER BY id")
+        sqlx::query_as("SELECT * FROM boards WHERE title LIKE $1 ORDER BY id")
             .bind(format!("%{}%", search))
             .fetch_all(&pool)
             .await
@@ -77,10 +77,10 @@ pub async fn get_boards(
 /// Получить доски для пользователя
 pub async fn get_boards_for_user(
     Path(user_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
 ) -> Result<Json<Vec<BoardView>>, (StatusCode, String)> {
     let boards: Vec<Board> =
-        sqlx::query_as("SELECT * FROM boards WHERE owner_id = ? OR is_shared = 1 ORDER BY id")
+        sqlx::query_as("SELECT * FROM boards WHERE owner_id = $1 OR is_shared = true ORDER BY id")
             .bind(user_id)
             .fetch_all(&pool)
             .await
@@ -98,7 +98,7 @@ pub async fn get_boards_for_user(
 /// Создать доску
 #[debug_handler]
 pub async fn create_board(
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     claims: Option<Extension<Claims>>,
     Json(payload): Json<CreateBoard>,
 ) -> Result<Json<Board>, (StatusCode, String)> {
@@ -119,7 +119,7 @@ pub async fn create_board(
     let owner_id = claims.map(|c| c.user_id).unwrap_or(1); // Default to 1 for tests
 
     let board: Board = sqlx::query_as::<_, Board>(
-        "INSERT INTO boards (title, owner_id, is_shared, visibility) VALUES (?, ?, ?, ?) RETURNING id, title, owner_id, is_shared, visibility",
+        "INSERT INTO boards (title, owner_id, is_shared, visibility) VALUES ($1, $2, $3, $4) RETURNING id, title, owner_id, is_shared, visibility",
     )
     .bind(&payload.title)
     .bind(owner_id)
@@ -131,7 +131,7 @@ pub async fn create_board(
 
     // Добавляем владельца как участника с ролью owner
     sqlx::query(
-        "INSERT OR IGNORE INTO board_members (board_id, user_id, role) VALUES (?, ?, 'owner')",
+        "INSERT INTO board_members (board_id, user_id, role) VALUES ($1, $2, 'owner') ON CONFLICT DO NOTHING",
     )
     .bind(board.id)
     .bind(owner_id)
@@ -159,12 +159,12 @@ pub async fn create_board(
 #[debug_handler]
 pub async fn update_board(
     Path(id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
     Json(payload): Json<UpdateBoard>,
 ) -> Result<Json<Board>, (StatusCode, String)> {
     // Проверка прав на редактирование
-    let board: Board = sqlx::query_as::<_, Board>("SELECT * FROM boards WHERE id = ?")
+    let board: Board = sqlx::query_as::<_, Board>("SELECT * FROM boards WHERE id = $1")
         .bind(id)
         .fetch_one(&pool)
         .await
@@ -183,7 +183,7 @@ pub async fn update_board(
     }
 
     let board: Board = sqlx::query_as::<_, Board>(
-        "UPDATE boards SET title = COALESCE(?, title), is_shared = COALESCE(?, is_shared), visibility = COALESCE(?, visibility) WHERE id = ? RETURNING id, title, owner_id, is_shared, visibility",
+        "UPDATE boards SET title = COALESCE($1, title), is_shared = COALESCE($2, is_shared), visibility = COALESCE($3, visibility) WHERE id = $4 RETURNING id, title, owner_id, is_shared, visibility",
     )
     .bind(&payload.title)
     .bind(payload.is_shared)
@@ -243,10 +243,10 @@ pub async fn update_board(
 /// Удалить доску
 pub async fn delete_board(
     Path(id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
 ) -> Result<Json<()>, (StatusCode, String)> {
     // Получаем название доски перед удалением
-    let board_title: Option<(String,)> = sqlx::query_as("SELECT title FROM boards WHERE id = ?")
+    let board_title: Option<(String,)> = sqlx::query_as("SELECT title FROM boards WHERE id = $1")
         .bind(id)
         .fetch_optional(&pool)
         .await
@@ -256,7 +256,7 @@ pub async fn delete_board(
         .map(|t| t.0)
         .unwrap_or_else(|| "неизвестно".to_string());
 
-    let result = sqlx::query("DELETE FROM boards WHERE id = ?")
+    let result = sqlx::query("DELETE FROM boards WHERE id = $1")
         .bind(id)
         .execute(&pool)
         .await
@@ -284,10 +284,10 @@ pub async fn delete_board(
 /// Получить участников доски
 pub async fn get_board_members(
     Path(board_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
 ) -> Result<Json<Vec<BoardMember>>, (StatusCode, String)> {
     let members: Vec<BoardMember> = sqlx::query_as(
-        "SELECT bm.board_id, bm.user_id, bm.role, u.username FROM board_members bm INNER JOIN users u ON bm.user_id = u.id WHERE bm.board_id = ?",
+        "SELECT bm.board_id, bm.user_id, bm.role, u.username FROM board_members bm INNER JOIN users u ON bm.user_id = u.id WHERE bm.board_id = $1",
     )
     .bind(board_id)
     .fetch_all(&pool)
@@ -301,12 +301,12 @@ pub async fn get_board_members(
 #[debug_handler]
 pub async fn add_board_member(
     Path(board_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
     Json(payload): Json<AddBoardMember>,
 ) -> Result<Json<()>, (StatusCode, String)> {
     // Проверка прав: только owner, admin могут добавлять участников
-    let board: Board = sqlx::query_as::<_, Board>("SELECT * FROM boards WHERE id = ?")
+    let board: Board = sqlx::query_as::<_, Board>("SELECT * FROM boards WHERE id = $1")
         .bind(board_id)
         .fetch_one(&pool)
         .await
@@ -325,7 +325,7 @@ pub async fn add_board_member(
     }
 
     let result = sqlx::query(
-        "INSERT OR REPLACE INTO board_members (board_id, user_id, role) VALUES (?, ?, ?)",
+        "INSERT INTO board_members (board_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (board_id, user_id) DO UPDATE SET role = EXCLUDED.role",
     )
     .bind(board_id)
     .bind(payload.user_id)
@@ -348,11 +348,11 @@ pub async fn add_board_member(
 #[debug_handler]
 pub async fn remove_board_member(
     Path((board_id, user_id)): Path<(i64, i64)>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<()>, (StatusCode, String)> {
     // Проверка прав: только owner, admin могут удалять участников
-    let board: Board = sqlx::query_as::<_, Board>("SELECT * FROM boards WHERE id = ?")
+    let board: Board = sqlx::query_as::<_, Board>("SELECT * FROM boards WHERE id = $1")
         .bind(board_id)
         .fetch_one(&pool)
         .await
@@ -370,7 +370,7 @@ pub async fn remove_board_member(
         ));
     }
 
-    let result = sqlx::query("DELETE FROM board_members WHERE board_id = ? AND user_id = ?")
+    let result = sqlx::query("DELETE FROM board_members WHERE board_id = $1 AND user_id = $2")
         .bind(board_id)
         .bind(user_id)
         .execute(&pool)
@@ -386,12 +386,12 @@ pub async fn remove_board_member(
 
 /// Вспомогательная функция для загрузки полной информации о доске
 async fn load_board_details(
-    pool: &SqlitePool,
+    pool: &PgPool,
     board: Board,
 ) -> Result<BoardView, (StatusCode, String)> {
     // Загружаем участников
     let members: Vec<BoardMember> = sqlx::query_as(
-        "SELECT bm.board_id, bm.user_id, bm.role, u.username FROM board_members bm INNER JOIN users u ON bm.user_id = u.id WHERE bm.board_id = ?",
+        "SELECT bm.board_id, bm.user_id, bm.role, u.username FROM board_members bm INNER JOIN users u ON bm.user_id = u.id WHERE bm.board_id = $1",
     )
     .bind(board.id)
     .fetch_all(pool)
@@ -400,7 +400,7 @@ async fn load_board_details(
 
     // Загружаем списки
     let lists_rows: Vec<List> = sqlx::query_as(
-        "SELECT id, board_id, title, position FROM lists WHERE board_id = ? ORDER BY position, id",
+        "SELECT id, board_id, title, position FROM lists WHERE board_id = $1 ORDER BY position, id",
     )
     .bind(board.id)
     .fetch_all(pool)
@@ -411,7 +411,7 @@ async fn load_board_details(
     let mut lists = Vec::new();
     for list in lists_rows {
         let cards: Vec<Card> = sqlx::query_as(
-            "SELECT id, list_id, title, content, done, due_date FROM cards WHERE list_id = ? ORDER BY position, id",
+            "SELECT id, list_id, title, content, done, due_date FROM cards WHERE list_id = $1 ORDER BY position, id",
         )
         .bind(list.id)
         .fetch_all(pool)
@@ -422,14 +422,14 @@ async fn load_board_details(
         let mut card_views = Vec::new();
         for card in cards {
             let labels: Vec<Label> =
-                sqlx::query_as("SELECT id, card_id, name, color FROM labels WHERE card_id = ?")
+                sqlx::query_as("SELECT id, card_id, name, color FROM labels WHERE card_id = $1")
                     .bind(card.id)
                     .fetch_all(pool)
                     .await
                     .unwrap_or_default();
 
             let attachments: Vec<Attachment> = sqlx::query_as(
-                "SELECT id, card_id, user_id, filename, file_path, file_size, mime_type, created_at FROM attachments WHERE card_id = ?"
+                "SELECT id, card_id, user_id, filename, file_path, file_size, mime_type, created_at FROM attachments WHERE card_id = $1"
             )
             .bind(card.id)
             .fetch_all(pool)
@@ -453,12 +453,12 @@ async fn load_board_details(
 
 /// Проверка, является ли пользователь участником доски
 async fn is_board_member(
-    pool: &SqlitePool,
+    pool: &PgPool,
     board_id: i64,
     user_id: i64,
 ) -> Result<bool, sqlx::Error> {
     let result: Option<(i64,)> =
-        sqlx::query_as("SELECT 1 FROM board_members WHERE board_id = ? AND user_id = ?")
+        sqlx::query_as("SELECT 1 FROM board_members WHERE board_id = $1 AND user_id = $2")
             .bind(board_id)
             .bind(user_id)
             .fetch_optional(pool)
@@ -468,15 +468,15 @@ async fn is_board_member(
 
 /// Проверка наличия роли у пользователя
 async fn has_role(
-    pool: &SqlitePool,
+    pool: &PgPool,
     board_id: i64,
     user_id: i64,
     roles: &[&str],
 ) -> Result<bool, sqlx::Error> {
-    let placeholders = roles.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+    let placeholders: Vec<String> = (3..3 + roles.len()).map(|i| format!("${}", i)).collect();
     let query = format!(
-        "SELECT 1 FROM board_members WHERE board_id = ? AND user_id = ? AND role IN ({})",
-        placeholders
+        "SELECT 1 FROM board_members WHERE board_id = $1 AND user_id = $2 AND role IN ({})",
+        placeholders.join(", ")
     );
 
     let mut sqlx_query = sqlx::query_as::<_, (i64,)>(&query)
@@ -494,10 +494,10 @@ async fn has_role(
 /// Получить роль пользователя на доске
 pub async fn get_user_board_role(
     Path((board_id, user_id)): Path<(i64, i64)>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
 ) -> Result<Json<String>, (StatusCode, String)> {
     let role: Option<(String,)> =
-        sqlx::query_as("SELECT role FROM board_members WHERE board_id = ? AND user_id = ?")
+        sqlx::query_as("SELECT role FROM board_members WHERE board_id = $1 AND user_id = $2")
             .bind(board_id)
             .bind(user_id)
             .fetch_optional(&pool)
@@ -514,12 +514,12 @@ pub async fn get_user_board_role(
 #[debug_handler]
 pub async fn create_invitation(
     Path(board_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
     Json(payload): Json<CreateInvitation>,
 ) -> Result<Json<InvitationView>, (StatusCode, String)> {
     // Проверка прав: только owner или admin могут приглашать
-    let board: Board = sqlx::query_as::<_, Board>("SELECT * FROM boards WHERE id = ?")
+    let board: Board = sqlx::query_as::<_, Board>("SELECT * FROM boards WHERE id = $1")
         .bind(board_id)
         .fetch_one(&pool)
         .await
@@ -548,7 +548,7 @@ pub async fn create_invitation(
     });
 
     let invitation: BoardInvitation = sqlx::query_as::<_, BoardInvitation>(
-        "INSERT INTO board_invitations (board_id, token, role, created_by, expires_at) VALUES (?, ?, ?, ?, ?) RETURNING *"
+        "INSERT INTO board_invitations (board_id, token, role, created_by, expires_at) VALUES ($1, $2, $3, $4, $5) RETURNING *"
     )
     .bind(board_id)
     .bind(&token)
@@ -573,12 +573,12 @@ pub async fn create_invitation(
 #[debug_handler]
 pub async fn accept_invitation(
     Path(token): Path<String>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<()>, (StatusCode, String)> {
     // Проверка токена
     let invitation: BoardInvitation = sqlx::query_as::<_, BoardInvitation>(
-        "SELECT * FROM board_invitations WHERE token = ? AND used = 0 AND (expires_at IS NULL OR expires_at > strftime('%s', 'now'))"
+        "SELECT * FROM board_invitations WHERE token = $1 AND used = false AND (expires_at IS NULL OR expires_at > EXTRACT(EPOCH FROM NOW())::BIGINT)"
     )
     .bind(&token)
     .fetch_one(&pool)
@@ -586,7 +586,7 @@ pub async fn accept_invitation(
     .map_err(|_e| (StatusCode::NOT_FOUND, "Приглашение не найдено или истекло".to_string()))?;
 
     // Добавляем пользователя на доску
-    sqlx::query("INSERT OR REPLACE INTO board_members (board_id, user_id, role) VALUES (?, ?, ?)")
+    sqlx::query("INSERT INTO board_members (board_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (board_id, user_id) DO UPDATE SET role = EXCLUDED.role")
         .bind(invitation.board_id)
         .bind(claims.user_id)
         .bind(&invitation.role)
@@ -595,7 +595,7 @@ pub async fn accept_invitation(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     // Помечаем приглашение как использованное
-    sqlx::query("UPDATE board_invitations SET used = 1 WHERE token = ?")
+    sqlx::query("UPDATE board_invitations SET used = true WHERE token = $1")
         .bind(&token)
         .execute(&pool)
         .await
@@ -608,10 +608,10 @@ pub async fn accept_invitation(
 #[debug_handler]
 pub async fn get_board_invitations(
     Path(board_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<Vec<InvitationView>>, (StatusCode, String)> {
-    let board: Board = sqlx::query_as::<_, Board>("SELECT * FROM boards WHERE id = ?")
+    let board: Board = sqlx::query_as::<_, Board>("SELECT * FROM boards WHERE id = $1")
         .bind(board_id)
         .fetch_one(&pool)
         .await
@@ -630,7 +630,7 @@ pub async fn get_board_invitations(
     }
 
     let invitations: Vec<BoardInvitation> = sqlx::query_as::<_, BoardInvitation>(
-        "SELECT * FROM board_invitations WHERE board_id = ? AND used = 0 ORDER BY created_at DESC",
+        "SELECT * FROM board_invitations WHERE board_id = $1 AND used = false ORDER BY created_at DESC",
     )
     .bind(board_id)
     .fetch_all(&pool)
@@ -659,10 +659,10 @@ pub async fn get_board_invitations(
 #[debug_handler]
 pub async fn delete_invitation(
     Path((board_id, token)): Path<(i64, String)>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<()>, (StatusCode, String)> {
-    let board: Board = sqlx::query_as::<_, Board>("SELECT * FROM boards WHERE id = ?")
+    let board: Board = sqlx::query_as::<_, Board>("SELECT * FROM boards WHERE id = $1")
         .bind(board_id)
         .fetch_one(&pool)
         .await
@@ -680,7 +680,7 @@ pub async fn delete_invitation(
         ));
     }
 
-    let result = sqlx::query("DELETE FROM board_invitations WHERE board_id = ? AND token = ?")
+    let result = sqlx::query("DELETE FROM board_invitations WHERE board_id = $1 AND token = $2")
         .bind(board_id)
         .bind(&token)
         .execute(&pool)

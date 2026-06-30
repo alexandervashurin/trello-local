@@ -1,6 +1,6 @@
 /// Скрипт для сброса пароля пользователя
 /// Использование: cargo run --bin reset_password <username> <new_password>
-use sqlx::SqlitePool;
+use sqlx::postgres::PgPool;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -29,15 +29,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::process::exit(1);
     }
 
-    let db_path = "data/trello.db";
-    let db_url = format!("sqlite://{}?mode=rwc", db_path);
-    let pool = SqlitePool::connect(&db_url).await?;
+    let database_url = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgres://trellouser@localhost/trello_db".to_string());
+    let pool = PgPool::connect(&database_url).await?;
 
     // Хеширование пароля
     let password_hash = bcrypt::hash(new_password, 12)?;
 
     // Обновление пароля
-    let result = sqlx::query("UPDATE users SET password_hash = ? WHERE username = ?")
+    let result = sqlx::query("UPDATE users SET password_hash = $1 WHERE username = $2")
         .bind(&password_hash)
         .bind(username)
         .execute(&pool)

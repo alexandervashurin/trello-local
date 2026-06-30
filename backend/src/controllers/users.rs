@@ -6,7 +6,7 @@ use axum::{
     Json,
 };
 use serde::Deserialize;
-use sqlx::SqlitePool;
+use sqlx::PgPool;
 
 #[derive(Deserialize)]
 pub struct GetUserQuery {
@@ -15,11 +15,11 @@ pub struct GetUserQuery {
 
 /// Получить всех пользователей (с опциональным поиском по имени)
 pub async fn get_users(
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     query: Query<GetUserQuery>,
 ) -> Result<Json<Vec<User>>, (StatusCode, String)> {
     let users: Vec<User> = if let Some(username) = &query.username {
-        sqlx::query_as("SELECT id, username, email, avatar_color, bio, last_login, created_at FROM users WHERE username = ? ORDER BY id")
+        sqlx::query_as("SELECT id, username, email, avatar_color, bio, last_login, created_at FROM users WHERE username = $1 ORDER BY id")
             .bind(username)
             .fetch_all(&pool)
             .await
@@ -35,17 +35,17 @@ pub async fn get_users(
 
 /// Создать пользователя
 pub async fn create_user(
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Json(payload): Json<CreateUser>,
 ) -> Result<Json<User>, (StatusCode, String)> {
     let user: User = sqlx::query_as::<_, User>(
-        "INSERT INTO users (username, created_at) VALUES (?, strftime('%s', 'now')) RETURNING id, username, email, avatar_color, bio, last_login, created_at",
+        "INSERT INTO users (username, created_at) VALUES ($1, EXTRACT(EPOCH FROM NOW())::BIGINT) RETURNING id, username, email, avatar_color, bio, last_login, created_at",
     )
     .bind(&payload.username)
     .fetch_one(&pool)
     .await
     .map_err(|e: sqlx::Error| {
-        if e.to_string().contains("UNIQUE constraint failed") {
+        if e.to_string().contains("duplicate key") {
             (StatusCode::CONFLICT, "Пользователь с таким именем уже существует".to_string())
         } else {
             (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
@@ -58,10 +58,10 @@ pub async fn create_user(
 /// Получить пользователя по ID
 pub async fn get_user(
     Path(id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
 ) -> Result<Json<User>, (StatusCode, String)> {
     let user: User = sqlx::query_as::<_, User>(
-        "SELECT id, username, email, avatar_color, bio, last_login, created_at FROM users WHERE id = ?",
+        "SELECT id, username, email, avatar_color, bio, last_login, created_at FROM users WHERE id = $1",
     )
     .bind(id)
     .fetch_one(&pool)
@@ -80,10 +80,10 @@ pub async fn get_user(
 /// Получить профиль текущего пользователя
 pub async fn get_profile(
     Extension(claims): Extension<Claims>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
 ) -> Result<Json<User>, (StatusCode, String)> {
     let user: User = sqlx::query_as::<_, User>(
-        "SELECT id, username, email, avatar_color, bio, last_login, created_at FROM users WHERE id = ?",
+        "SELECT id, username, email, avatar_color, bio, last_login, created_at FROM users WHERE id = $1",
     )
     .bind(claims.user_id)
     .fetch_one(&pool)
@@ -102,7 +102,7 @@ pub async fn get_profile(
 /// Обновить профиль пользователя
 pub async fn update_profile(
     Extension(claims): Extension<Claims>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Json(payload): Json<UpdateProfile>,
 ) -> Result<Json<User>, (StatusCode, String)> {
     // Валидация email если предоставлен
@@ -113,7 +113,7 @@ pub async fn update_profile(
     }
 
     let user: User = sqlx::query_as::<_, User>(
-        "UPDATE users SET email = COALESCE(?, email), avatar_color = COALESCE(?, avatar_color), bio = COALESCE(?, bio) WHERE id = ? RETURNING id, username, email, avatar_color, bio, last_login, created_at",
+        "UPDATE users SET email = COALESCE($1, email), avatar_color = COALESCE($2, avatar_color), bio = COALESCE($3, bio) WHERE id = $4 RETURNING id, username, email, avatar_color, bio, last_login, created_at",
     )
     .bind(&payload.email)
     .bind(&payload.avatar_color)
@@ -131,12 +131,12 @@ pub async fn update_profile(
 /// Сменить пароль пользователя
 pub async fn change_password(
     Extension(claims): Extension<Claims>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Json(payload): Json<ChangePassword>,
 ) -> Result<Json<()>, (StatusCode, String)> {
     // Получаем текущий хэш пароля
     let user_with_password: crate::models::UserWithPassword = sqlx::query_as(
-        "SELECT id, username, password_hash, email, avatar_color, bio, last_login, created_at FROM users WHERE id = ?",
+        "SELECT id, username, password_hash, email, avatar_color, bio, last_login, created_at FROM users WHERE id = $1",
     )
     .bind(claims.user_id)
     .fetch_one(&pool)
@@ -203,7 +203,7 @@ pub async fn change_password(
     let new_password_hash = bcrypt::hash(&payload.new_password, 12)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    sqlx::query("UPDATE users SET password_hash = ? WHERE id = ?")
+    sqlx::query("UPDATE users SET password_hash = $1 WHERE id = $2")
         .bind(&new_password_hash)
         .bind(claims.user_id)
         .execute(&pool)
@@ -225,12 +225,12 @@ pub async fn change_password(
 /// Удалить аккаунт пользователя
 pub async fn delete_account(
     Extension(claims): Extension<Claims>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Json(payload): Json<DeleteAccount>,
 ) -> Result<Json<()>, (StatusCode, String)> {
     // Проверяем пароль для подтверждения
     let user_with_password: crate::models::UserWithPassword = sqlx::query_as(
-        "SELECT id, username, password_hash, email, avatar_color, bio, last_login, created_at FROM users WHERE id = ?",
+        "SELECT id, username, password_hash, email, avatar_color, bio, last_login, created_at FROM users WHERE id = $1",
     )
     .bind(claims.user_id)
     .fetch_one(&pool)
@@ -275,7 +275,7 @@ pub async fn delete_account(
     );
 
     // Удаляем пользователя (каскадно удалит все связанные данные)
-    sqlx::query("DELETE FROM users WHERE id = ?")
+    sqlx::query("DELETE FROM users WHERE id = $1")
         .bind(claims.user_id)
         .execute(&pool)
         .await

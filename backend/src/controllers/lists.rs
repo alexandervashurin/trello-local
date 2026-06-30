@@ -5,12 +5,12 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use sqlx::SqlitePool;
+use sqlx::PgPool;
 
 /// Создать список в доске
 pub async fn create_list(
     Path(board_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Json(payload): Json<CreateList>,
 ) -> Result<Json<List>, (StatusCode, String)> {
     // Валидация названия
@@ -28,7 +28,7 @@ pub async fn create_list(
     }
 
     let list: List = sqlx::query_as::<_, List>(
-        "INSERT INTO lists (board_id, title) VALUES (?, ?) RETURNING id, board_id, title, position",
+        "INSERT INTO lists (board_id, title) VALUES ($1, $2) RETURNING id, board_id, title, position",
     )
     .bind(board_id)
     .bind(&payload.title)
@@ -55,12 +55,12 @@ pub async fn create_list(
 /// Обновить список
 pub async fn update_list(
     Path(id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Json(payload): Json<UpdateList>,
 ) -> Result<Json<List>, (StatusCode, String)> {
     // Получаем текущий список и board_id
     let current: List =
-        sqlx::query_as::<_, List>("SELECT id, board_id, title, position FROM lists WHERE id = ?")
+        sqlx::query_as::<_, List>("SELECT id, board_id, title, position FROM lists WHERE id = $1")
             .bind(id)
             .fetch_one(&pool)
             .await
@@ -75,7 +75,7 @@ pub async fn update_list(
     let board_id = current.board_id;
 
     let list: List = sqlx::query_as::<_, List>(
-        "UPDATE lists SET title = ? WHERE id = ? RETURNING id, board_id, title, position",
+        "UPDATE lists SET title = $1 WHERE id = $2 RETURNING id, board_id, title, position",
     )
     .bind(&payload.title)
     .bind(id)
@@ -113,11 +113,11 @@ pub async fn update_list(
 /// Удалить список
 pub async fn delete_list(
     Path(id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
 ) -> Result<Json<()>, (StatusCode, String)> {
     // Получаем информацию о списке перед удалением
     let list: Option<(String, i64)> =
-        sqlx::query_as("SELECT title, board_id FROM lists WHERE id = ?")
+        sqlx::query_as("SELECT title, board_id FROM lists WHERE id = $1")
             .bind(id)
             .fetch_optional(&pool)
             .await
@@ -125,7 +125,7 @@ pub async fn delete_list(
 
     let (title, board_id) = list.ok_or((StatusCode::NOT_FOUND, "Список не найден".to_string()))?;
 
-    let result = sqlx::query("DELETE FROM lists WHERE id = ?")
+    let result = sqlx::query("DELETE FROM lists WHERE id = $1")
         .bind(id)
         .execute(&pool)
         .await

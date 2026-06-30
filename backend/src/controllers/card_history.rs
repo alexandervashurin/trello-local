@@ -6,12 +6,12 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use sqlx::SqlitePool;
+use sqlx::PgPool;
 
 /// Получить историю изменений карточки
 pub async fn get_card_history(
     Path(card_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<Vec<CardVersionWithUser>>, (StatusCode, String)> {
     // Проверка прав доступа
@@ -23,8 +23,8 @@ pub async fn get_card_history(
     let has_access: Option<(i64,)> = sqlx::query_as(
         r#"
         SELECT 1 FROM boards b
-        LEFT JOIN board_members bm ON b.id = bm.board_id AND bm.user_id = ?
-        WHERE b.id = ? AND (b.owner_id = ? OR b.visibility = 'public' OR bm.user_id = ?)
+        LEFT JOIN board_members bm ON b.id = bm.board_id AND bm.user_id = $1
+        WHERE b.id = $2 AND (b.owner_id = $3 OR b.visibility = 'public' OR bm.user_id = $4)
         "#,
     )
     .bind(claims.user_id)
@@ -61,7 +61,7 @@ pub async fn get_card_history(
             u.username as editor_username
         FROM card_versions cv
         INNER JOIN users u ON cv.edited_by = u.id
-        WHERE cv.card_id = ?
+        WHERE cv.card_id = $1
         ORDER BY cv.edited_at DESC
         LIMIT 50
         "#,
@@ -93,7 +93,7 @@ pub async fn get_card_history(
 
 /// Сохранить версию карточки (вызывается при обновлении)
 pub async fn save_card_version(
-    pool: &SqlitePool,
+    pool: &PgPool,
     card_id: i64,
     user_id: i64,
     change_summary: &str,
@@ -101,14 +101,14 @@ pub async fn save_card_version(
     // Получаем текущие данные карточки
     #[allow(clippy::type_complexity)]
     let card: Option<(String, Option<String>, bool, Option<i64>, i64)> =
-        sqlx::query_as("SELECT title, content, done, due_date, list_id FROM cards WHERE id = ?")
+        sqlx::query_as("SELECT title, content, done, due_date, list_id FROM cards WHERE id = $1")
             .bind(card_id)
             .fetch_optional(pool)
             .await?;
 
     if let Some((title, content, done, due_date, list_id)) = card {
         sqlx::query(
-            "INSERT INTO card_versions (card_id, title, content, done, due_date, list_id, edited_by, change_summary) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO card_versions (card_id, title, content, done, due_date, list_id, edited_by, change_summary) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
         )
         .bind(card_id)
         .bind(&title)

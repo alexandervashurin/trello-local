@@ -2,6 +2,7 @@
 // MVC Architecture: Model-View-Controller
 pub mod controllers;
 pub mod db;
+pub mod jwt;
 pub mod middleware;
 pub mod models;
 pub mod views;
@@ -41,7 +42,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Абсолютные пути для frontend (или относительные для разработки)
     let frontend_dir =
-        std::env::var("FRONTEND_DIR").unwrap_or_else(|_| "/opt/trello-local/frontend".to_string());
+        std::env::var("FRONTEND_DIR").unwrap_or_else(|_| "../frontend".to_string());
     let index_html = format!("{}/index.html", frontend_dir);
     let login_html = format!("{}/login.html", frontend_dir);
     let invite_html = format!("{}/invite.html", frontend_dir);

@@ -4,29 +4,11 @@ use crate::models::{
 use crate::views::{AuthToken, Claims, ClaimsWith2FA};
 use axum::{extract::State, http::StatusCode, Json};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
-use sqlx::SqlitePool;
+use sqlx::PgPool;
 use std::time::SystemTime;
 
 use crate::controllers::sessions;
-
-/// Получение JWT secret из переменной окружения
-fn get_jwt_secret() -> Vec<u8> {
-    std::env::var("JWT_SECRET")
-        .inspect_err(|_| {
-            tracing::warn!(
-                "JWT_SECRET не установлен! Используйте уникальное значение в production"
-            );
-        })
-        .unwrap_or_else(|_| {
-            use std::time::{SystemTime, UNIX_EPOCH};
-            let seed = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("Время не может идти вспять")
-                .as_nanos();
-            format!("dev-secret-{}", seed)
-        })
-        .into_bytes()
-}
+use crate::jwt::get_jwt_secret;
 
 /// Генерация JWT токена
 pub fn generate_token(
@@ -52,7 +34,7 @@ pub fn generate_token(
     encode(
         &Header::default(),
         &claims,
-        &EncodingKey::from_secret(&get_jwt_secret()),
+        &EncodingKey::from_secret(get_jwt_secret()),
     )
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
@@ -77,14 +59,14 @@ fn generate_temp_token(user_id: i64, username: &str) -> Result<String, (StatusCo
     encode(
         &Header::default(),
         &claims,
-        &EncodingKey::from_secret(&get_jwt_secret()),
+        &EncodingKey::from_secret(get_jwt_secret()),
     )
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
 /// Регистрация нового пользователя
 pub async fn register(
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Json(payload): Json<RegisterUser>,
 ) -> Result<Json<AuthToken>, (StatusCode, String)> {
     // Валидация имени пользователя
@@ -125,14 +107,14 @@ pub async fn register(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let user: User = sqlx::query_as::<_, User>(
-        "INSERT INTO users (username, password_hash, created_at, two_factor_enabled) VALUES (?, ?, strftime('%s', 'now'), 0) RETURNING id, username, email, avatar_color, bio, last_login, created_at, two_factor_enabled, two_factor_secret",
+        "INSERT INTO users (username, password_hash, created_at, two_factor_enabled) VALUES ($1, $2, EXTRACT(EPOCH FROM NOW())::BIGINT, false) RETURNING id, username, email, avatar_color, bio, last_login, created_at, two_factor_enabled, two_factor_secret",
     )
     .bind(&payload.username)
     .bind(&password_hash)
     .fetch_one(&pool)
     .await
     .map_err(|e: sqlx::Error| {
-        if e.to_string().contains("UNIQUE constraint failed") {
+        if e.to_string().contains("duplicate key") {
             (StatusCode::CONFLICT, "Пользователь с таким именем уже существует".to_string())
         } else {
             (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
@@ -162,11 +144,11 @@ pub async fn register(
 
 /// Вход пользователя
 pub async fn login(
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Json(payload): Json<LoginUser>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     let user_with_password: crate::models::UserWithPassword = sqlx::query_as(
-        "SELECT id, username, password_hash, email, avatar_color, bio, last_login, created_at, two_factor_enabled, two_factor_secret FROM users WHERE username = ?",
+        "SELECT id, username, password_hash, email, avatar_color, bio, last_login, created_at, two_factor_enabled, two_factor_secret FROM users WHERE username = $1",
     )
     .bind(&payload.username)
     .fetch_one(&pool)
@@ -211,7 +193,7 @@ pub async fn login(
     }
 
     // Обновляем last_login
-    let _ = sqlx::query("UPDATE users SET last_login = strftime('%s', 'now') WHERE id = ?")
+    let _ = sqlx::query("UPDATE users SET last_login = EXTRACT(EPOCH FROM NOW())::BIGINT WHERE id = $1")
         .bind(user_with_password.id)
         .execute(&pool)
         .await;
@@ -264,12 +246,12 @@ pub async fn login(
 
 /// Валидация токена
 pub async fn validate_token(
-    State(_pool): State<SqlitePool>,
+    State(_pool): State<PgPool>,
     token: String,
 ) -> Result<Json<Claims>, (StatusCode, String)> {
     let result = decode::<ClaimsWith2FA>(
         &token,
-        &DecodingKey::from_secret(&get_jwt_secret()),
+        &DecodingKey::from_secret(get_jwt_secret()),
         &Validation::new(Algorithm::HS256),
     );
 
@@ -290,7 +272,7 @@ pub async fn validate_token(
 
 /// Генерация 2FA setup для пользователя
 pub async fn generate_2fa_setup(
-    State(_pool): State<SqlitePool>,
+    State(_pool): State<PgPool>,
     Json(_payload): Json<TwoFACode>,
 ) -> Result<Json<TwoFASetup>, (StatusCode, String)> {
     // Генерируем случайный секрет
@@ -355,7 +337,7 @@ pub async fn generate_2fa_setup(
 
 /// Проверка и включение 2FA
 pub async fn enable_2fa(
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Json(payload): Json<TwoFAEnable>,
 ) -> Result<Json<TwoFAStatus>, (StatusCode, String)> {
     // Получаем ID пользователя из контекста (должен быть аутентифицирован)
@@ -363,7 +345,7 @@ pub async fn enable_2fa(
     let user_id = 1; // Заглушка, нужно извлекать из Claims
 
     let user: User = sqlx::query_as::<_, User>(
-        "SELECT id, username, email, avatar_color, bio, last_login, created_at, two_factor_enabled, two_factor_secret FROM users WHERE id = ?",
+        "SELECT id, username, email, avatar_color, bio, last_login, created_at, two_factor_enabled, two_factor_secret FROM users WHERE id = $1",
     )
     .bind(user_id)
     .fetch_one(&pool)
@@ -421,7 +403,7 @@ pub async fn enable_2fa(
         }
 
         // Включаем 2FA
-        sqlx::query("UPDATE users SET two_factor_enabled = 1, two_factor_secret = ? WHERE id = ?")
+        sqlx::query("UPDATE users SET two_factor_enabled = true, two_factor_secret = $1 WHERE id = $2")
             .bind(&secret)
             .bind(user_id)
             .execute(&pool)
@@ -439,7 +421,7 @@ pub async fn enable_2fa(
     } else {
         // Выключаем 2FA
         sqlx::query(
-            "UPDATE users SET two_factor_enabled = 0, two_factor_secret = NULL WHERE id = ?",
+            "UPDATE users SET two_factor_enabled = false, two_factor_secret = NULL WHERE id = $1",
         )
         .bind(user_id)
         .execute(&pool)
@@ -459,14 +441,14 @@ pub async fn enable_2fa(
 
 /// Проверка 2FA кода после ввода пароля
 pub async fn verify_2fa(
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Json(payload): Json<TwoFACode>,
 ) -> Result<Json<AuthToken>, (StatusCode, String)> {
     // Извлекаем user_id из временного токена
     let user_id = if let Some(ref temp_token) = payload.temp_token {
         match decode::<ClaimsWith2FA>(
             temp_token,
-            &DecodingKey::from_secret(&get_jwt_secret()),
+            &DecodingKey::from_secret(get_jwt_secret()),
             &Validation::new(Algorithm::HS256),
         ) {
             Ok(data) => data.claims.user_id,
@@ -479,7 +461,7 @@ pub async fn verify_2fa(
     };
 
     let user: User = sqlx::query_as::<_, User>(
-        "SELECT id, username, email, avatar_color, bio, last_login, created_at, two_factor_enabled, two_factor_secret FROM users WHERE id = ?",
+        "SELECT id, username, email, avatar_color, bio, last_login, created_at, two_factor_enabled, two_factor_secret FROM users WHERE id = $1",
     )
     .bind(user_id)
     .fetch_one(&pool)
@@ -553,13 +535,13 @@ pub async fn verify_2fa(
 
 /// Получение статуса 2FA для текущего пользователя
 pub async fn get_2fa_status(
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
 ) -> Result<Json<TwoFAStatus>, (StatusCode, String)> {
     // Заглушка - в реальности нужно извлекать user_id из токена
     let user_id = 1;
 
     let user: User = sqlx::query_as::<_, User>(
-        "SELECT id, username, email, avatar_color, bio, last_login, created_at, two_factor_enabled, two_factor_secret FROM users WHERE id = ?",
+        "SELECT id, username, email, avatar_color, bio, last_login, created_at, two_factor_enabled, two_factor_secret FROM users WHERE id = $1",
     )
     .bind(user_id)
     .fetch_one(&pool)

@@ -9,7 +9,7 @@ use axum::{
     Extension, Json,
 };
 use chrono::Utc;
-use sqlx::SqlitePool;
+use sqlx::PgPool;
 use std::path::PathBuf;
 use tokio::fs;
 
@@ -17,7 +17,7 @@ const BACKUP_DIR: &str = "./backups";
 
 /// Создать backup базы данных
 pub async fn create_backup(
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
     Json(payload): Json<CreateBackup>,
 ) -> Result<Json<Backup>, (StatusCode, String)> {
@@ -63,7 +63,7 @@ pub async fn create_backup(
 
     // Сохраняем запись в БД
     let backup = sqlx::query_as::<_, Backup>(
-        "INSERT INTO backups (filename, file_path, file_size, created_by, description) VALUES (?, ?, ?, ?, ?) RETURNING *",
+        "INSERT INTO backups (filename, file_path, file_size, created_by, description) VALUES ($1, $2, $3, $4, $5) RETURNING *",
     )
     .bind(&filename)
     .bind(file_path.to_str().unwrap())
@@ -87,7 +87,7 @@ pub async fn create_backup(
 
 /// Получить список backup'ов
 pub async fn list_backups(
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<Vec<BackupList>>, (StatusCode, String)> {
     // Проверка прав: только admin может просматривать backup'ы
@@ -114,7 +114,7 @@ pub async fn list_backups(
 /// Скачать backup файл
 pub async fn download_backup(
     Path(backup_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Response<Body>, (StatusCode, String)> {
     // Проверка прав
@@ -126,7 +126,7 @@ pub async fn download_backup(
     }
 
     // Получаем информацию о backup
-    let backup: Backup = sqlx::query_as::<_, Backup>("SELECT * FROM backups WHERE id = ?")
+    let backup: Backup = sqlx::query_as::<_, Backup>("SELECT * FROM backups WHERE id = $1")
         .bind(backup_id)
         .fetch_one(&pool)
         .await
@@ -164,7 +164,7 @@ pub async fn download_backup(
 /// Восстановить из backup
 pub async fn restore_backup(
     Path(backup_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<Backup>, (StatusCode, String)> {
     // Проверка прав: только admin может восстанавливать
@@ -176,7 +176,7 @@ pub async fn restore_backup(
     }
 
     // Получаем информацию о backup
-    let backup: Backup = sqlx::query_as::<_, Backup>("SELECT * FROM backups WHERE id = ?")
+    let backup: Backup = sqlx::query_as::<_, Backup>("SELECT * FROM backups WHERE id = $1")
         .bind(backup_id)
         .fetch_one(&pool)
         .await
@@ -213,7 +213,7 @@ pub async fn restore_backup(
 /// Удалить backup
 pub async fn delete_backup(
     Path(backup_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     // Проверка прав
@@ -225,7 +225,7 @@ pub async fn delete_backup(
     }
 
     // Получаем информацию о backup
-    let backup: Backup = sqlx::query_as::<_, Backup>("SELECT * FROM backups WHERE id = ?")
+    let backup: Backup = sqlx::query_as::<_, Backup>("SELECT * FROM backups WHERE id = $1")
         .bind(backup_id)
         .fetch_one(&pool)
         .await
@@ -243,7 +243,7 @@ pub async fn delete_backup(
     }
 
     // Удаляем запись из БД
-    sqlx::query("DELETE FROM backups WHERE id = ?")
+    sqlx::query("DELETE FROM backups WHERE id = $1")
         .bind(backup_id)
         .execute(&pool)
         .await
@@ -261,10 +261,10 @@ pub async fn delete_backup(
 }
 
 /// Проверка прав администратора
-async fn is_admin(pool: &SqlitePool, user_id: i64) -> Result<bool, sqlx::Error> {
+async fn is_admin(pool: &PgPool, user_id: i64) -> Result<bool, sqlx::Error> {
     // В простой реализации проверяем, есть ли у пользователя доски с ролью owner
     let result: Option<(i64,)> =
-        sqlx::query_as("SELECT 1 FROM board_members WHERE user_id = ? AND role = 'owner' LIMIT 1")
+        sqlx::query_as("SELECT 1 FROM board_members WHERE user_id = $1 AND role = 'owner' LIMIT 1")
             .bind(user_id)
             .fetch_optional(pool)
             .await?;

@@ -6,15 +6,15 @@ use axum::{
     Json,
 };
 use sha2::{Digest, Sha256};
-use sqlx::SqlitePool;
+use sqlx::PgPool;
 
 /// Получить все сессии текущего пользователя
 pub async fn get_sessions(
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<Vec<SessionInfo>>, (StatusCode, String)> {
     let sessions: Vec<Session> = sqlx::query_as(
-        "SELECT id, user_id, token_hash, user_agent, ip_address, created_at, expires_at, last_activity FROM sessions WHERE user_id = ? ORDER BY created_at DESC",
+        "SELECT id, user_id, token_hash, user_agent, ip_address, created_at, expires_at, last_activity FROM sessions WHERE user_id = $1 ORDER BY created_at DESC",
     )
     .bind(claims.user_id)
     .fetch_all(&pool)
@@ -42,11 +42,11 @@ pub async fn get_sessions(
 
 /// Завершить конкретную сессию
 pub async fn delete_session(
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
     Path(session_id): Path<i64>,
 ) -> Result<Json<()>, (StatusCode, String)> {
-    let result = sqlx::query("DELETE FROM sessions WHERE id = ? AND user_id = ?")
+    let result = sqlx::query("DELETE FROM sessions WHERE id = $1 AND user_id = $2")
         .bind(session_id)
         .bind(claims.user_id)
         .execute(&pool)
@@ -62,10 +62,10 @@ pub async fn delete_session(
 
 /// Завершить все сессии текущего пользователя (logout везде)
 pub async fn delete_all_sessions(
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<()>, (StatusCode, String)> {
-    let _result = sqlx::query("DELETE FROM sessions WHERE user_id = ?")
+    let _result = sqlx::query("DELETE FROM sessions WHERE user_id = $1")
         .bind(claims.user_id)
         .execute(&pool)
         .await
@@ -84,7 +84,7 @@ pub fn hash_token(token: &str) -> String {
 
 /// Сохранение сессии в БД
 pub async fn save_session(
-    pool: &SqlitePool,
+    pool: &PgPool,
     user_id: i64,
     token: &str,
     user_agent: Option<&str>,
@@ -98,7 +98,7 @@ pub async fn save_session(
     let expires_at = now + 60 * 60 * 24 * 7; // 7 дней
 
     sqlx::query(
-        "INSERT INTO sessions (user_id, token_hash, user_agent, ip_address, created_at, expires_at, last_activity) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO sessions (user_id, token_hash, user_agent, ip_address, created_at, expires_at, last_activity) VALUES ($1, $2, $3, $4, $5, $6, $7)",
     )
     .bind(user_id)
     .bind(&token_hash)
@@ -114,14 +114,14 @@ pub async fn save_session(
 }
 
 /// Обновление времени последней активности сессии
-pub async fn update_session_activity(pool: &SqlitePool, token: &str) -> Result<(), sqlx::Error> {
+pub async fn update_session_activity(pool: &PgPool, token: &str) -> Result<(), sqlx::Error> {
     let token_hash = hash_token(token);
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("Время не может идти вспять")
         .as_secs() as i64;
 
-    sqlx::query("UPDATE sessions SET last_activity = ? WHERE token_hash = ?")
+    sqlx::query("UPDATE sessions SET last_activity = $1 WHERE token_hash = $2")
         .bind(now)
         .bind(&token_hash)
         .execute(pool)
@@ -131,7 +131,7 @@ pub async fn update_session_activity(pool: &SqlitePool, token: &str) -> Result<(
 }
 
 /// Проверка токена по сессии
-pub async fn is_session_valid(pool: &SqlitePool, token: &str) -> Result<bool, sqlx::Error> {
+pub async fn is_session_valid(pool: &PgPool, token: &str) -> Result<bool, sqlx::Error> {
     let token_hash = hash_token(token);
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -139,7 +139,7 @@ pub async fn is_session_valid(pool: &SqlitePool, token: &str) -> Result<bool, sq
         .as_secs() as i64;
 
     let result: Option<(i64,)> =
-        sqlx::query_as("SELECT id FROM sessions WHERE token_hash = ? AND expires_at > ?")
+        sqlx::query_as("SELECT id FROM sessions WHERE token_hash = $1 AND expires_at > $2")
             .bind(&token_hash)
             .bind(now)
             .fetch_optional(pool)

@@ -6,17 +6,17 @@ use axum::{
     http::StatusCode,
     Extension, Json,
 };
-use sqlx::SqlitePool;
+use sqlx::PgPool;
 
 /// Получить все права для доски
 pub async fn get_board_permissions(
     Path(board_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<Vec<BoardPermission>>, (StatusCode, String)> {
     // Проверка прав: только owner или admin могут просматривать права
     let board: crate::models::Board =
-        sqlx::query_as::<_, crate::models::Board>("SELECT * FROM boards WHERE id = ?")
+        sqlx::query_as::<_, crate::models::Board>("SELECT * FROM boards WHERE id = $1")
             .bind(board_id)
             .fetch_one(&pool)
             .await
@@ -35,7 +35,7 @@ pub async fn get_board_permissions(
     }
 
     let permissions =
-        sqlx::query_as::<_, BoardPermission>("SELECT * FROM board_permissions WHERE board_id = ?")
+        sqlx::query_as::<_, BoardPermission>("SELECT * FROM board_permissions WHERE board_id = $1")
             .bind(board_id)
             .fetch_all(&pool)
             .await
@@ -47,13 +47,13 @@ pub async fn get_board_permissions(
 /// Обновить права для роли
 pub async fn update_role_permissions(
     Path((board_id, role)): Path<(i64, String)>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
     Json(payload): Json<UpdateRolePermissions>,
 ) -> Result<Json<BoardPermission>, (StatusCode, String)> {
     // Проверка прав: только owner может изменять права
     let board: crate::models::Board =
-        sqlx::query_as::<_, crate::models::Board>("SELECT * FROM boards WHERE id = ?")
+        sqlx::query_as::<_, crate::models::Board>("SELECT * FROM boards WHERE id = $1")
             .bind(board_id)
             .fetch_one(&pool)
             .await
@@ -76,7 +76,7 @@ pub async fn update_role_permissions(
 
     // Проверяем, существует ли запись о правах
     let existing: Option<BoardPermission> = sqlx::query_as::<_, BoardPermission>(
-        "SELECT * FROM board_permissions WHERE board_id = ? AND role = ?",
+        "SELECT * FROM board_permissions WHERE board_id = $1 AND role = $2",
     )
     .bind(board_id)
     .bind(&role)
@@ -86,57 +86,70 @@ pub async fn update_role_permissions(
 
     let permission = if let Some(perm) = existing {
         // Обновляем существующие права
-        let mut updates = Vec::new();
+        let mut set_clauses = Vec::new();
         let mut bool_values = Vec::new();
+        let mut param_idx = 1;
 
         if let Some(val) = payload.can_view {
-            updates.push("can_view = ?");
+            set_clauses.push(format!("can_view = ${}", param_idx));
             bool_values.push(val);
+            param_idx += 1;
         }
         if let Some(val) = payload.can_create_cards {
-            updates.push("can_create_cards = ?");
+            set_clauses.push(format!("can_create_cards = ${}", param_idx));
             bool_values.push(val);
+            param_idx += 1;
         }
         if let Some(val) = payload.can_edit_cards {
-            updates.push("can_edit_cards = ?");
+            set_clauses.push(format!("can_edit_cards = ${}", param_idx));
             bool_values.push(val);
+            param_idx += 1;
         }
         if let Some(val) = payload.can_delete_cards {
-            updates.push("can_delete_cards = ?");
+            set_clauses.push(format!("can_delete_cards = ${}", param_idx));
             bool_values.push(val);
+            param_idx += 1;
         }
         if let Some(val) = payload.can_move_cards {
-            updates.push("can_move_cards = ?");
+            set_clauses.push(format!("can_move_cards = ${}", param_idx));
             bool_values.push(val);
+            param_idx += 1;
         }
         if let Some(val) = payload.can_create_lists {
-            updates.push("can_create_lists = ?");
+            set_clauses.push(format!("can_create_lists = ${}", param_idx));
             bool_values.push(val);
+            param_idx += 1;
         }
         if let Some(val) = payload.can_edit_lists {
-            updates.push("can_edit_lists = ?");
+            set_clauses.push(format!("can_edit_lists = ${}", param_idx));
             bool_values.push(val);
+            param_idx += 1;
         }
         if let Some(val) = payload.can_delete_lists {
-            updates.push("can_delete_lists = ?");
+            set_clauses.push(format!("can_delete_lists = ${}", param_idx));
             bool_values.push(val);
+            param_idx += 1;
         }
         if let Some(val) = payload.can_manage_members {
-            updates.push("can_manage_members = ?");
+            set_clauses.push(format!("can_manage_members = ${}", param_idx));
             bool_values.push(val);
+            param_idx += 1;
         }
         if let Some(val) = payload.can_manage_settings {
-            updates.push("can_manage_settings = ?");
+            set_clauses.push(format!("can_manage_settings = ${}", param_idx));
             bool_values.push(val);
+            param_idx += 1;
         }
 
-        if updates.is_empty() {
+        if set_clauses.is_empty() {
             return Ok(Json(perm));
         }
 
         let query = format!(
-            "UPDATE board_permissions SET {} WHERE board_id = ? AND role = ? RETURNING *",
-            updates.join(", ")
+            "UPDATE board_permissions SET {} WHERE board_id = ${} AND role = ${} RETURNING *",
+            set_clauses.join(", "),
+            param_idx,
+            param_idx + 1,
         );
 
         let mut sqlx_query = sqlx::query_as::<_, BoardPermission>(&query);
@@ -167,7 +180,7 @@ pub async fn update_role_permissions(
              (board_id, role, can_view, can_create_cards, can_edit_cards, can_delete_cards, 
               can_move_cards, can_create_lists, can_edit_lists, can_delete_lists, 
               can_manage_members, can_manage_settings) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) 
              RETURNING *",
         )
         .bind(board_id)
@@ -201,15 +214,17 @@ pub async fn update_role_permissions(
 
 /// Проверка наличия роли у пользователя
 async fn has_role(
-    pool: &SqlitePool,
+    pool: &PgPool,
     board_id: i64,
     user_id: i64,
     roles: &[&str],
 ) -> Result<bool, sqlx::Error> {
-    let placeholders = roles.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let placeholders: Vec<String> = (0..roles.len())
+        .map(|i| format!("${}", i + 3))
+        .collect();
     let query = format!(
-        "SELECT 1 FROM board_members WHERE board_id = ? AND user_id = ? AND role IN ({})",
-        placeholders
+        "SELECT 1 FROM board_members WHERE board_id = $1 AND user_id = $2 AND role IN ({})",
+        placeholders.join(", ")
     );
 
     let mut sqlx_query = sqlx::query_as::<_, (i64,)>(&query)
@@ -227,11 +242,11 @@ async fn has_role(
 /// Проверка конкретного права пользователя
 pub async fn check_permission(
     Path((board_id, permission)): Path<(i64, String)>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<bool>, (StatusCode, String)> {
     let board: crate::models::Board =
-        sqlx::query_as::<_, crate::models::Board>("SELECT * FROM boards WHERE id = ?")
+        sqlx::query_as::<_, crate::models::Board>("SELECT * FROM boards WHERE id = $1")
             .bind(board_id)
             .fetch_one(&pool)
             .await
@@ -244,7 +259,7 @@ pub async fn check_permission(
 
     // Получаем роль пользователя
     let member_role: Option<(String,)> =
-        sqlx::query_as("SELECT role FROM board_members WHERE board_id = ? AND user_id = ?")
+        sqlx::query_as("SELECT role FROM board_members WHERE board_id = $1 AND user_id = $2")
             .bind(board_id)
             .bind(claims.user_id)
             .fetch_optional(&pool)
@@ -258,7 +273,7 @@ pub async fn check_permission(
 
     // Получаем права для роли
     let permission_row: Option<BoardPermission> = sqlx::query_as::<_, BoardPermission>(
-        "SELECT * FROM board_permissions WHERE board_id = ? AND role = ?",
+        "SELECT * FROM board_permissions WHERE board_id = $1 AND role = $2",
     )
     .bind(board_id)
     .bind(&role)

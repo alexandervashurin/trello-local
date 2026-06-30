@@ -36,6 +36,11 @@ export async function getBoardStats(boardId) {
   }
 }
 
+export function closeBoardStats() {
+  const modal = document.getElementById('stats-modal');
+  if (modal) modal.style.display = 'none';
+}
+
 function downloadFile(content, filename, mimeType) {
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);

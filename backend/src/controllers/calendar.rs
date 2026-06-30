@@ -5,7 +5,7 @@ use axum::{
 };
 use chrono::Datelike;
 use serde::Deserialize;
-use sqlx::SqlitePool;
+use sqlx::PgPool;
 
 /// Параметры запроса календаря
 #[derive(Deserialize, Default)]
@@ -55,7 +55,7 @@ type CardRow = (i64, String, bool, i64, i64, String, i64, String);
 /// Получить календарь дедлайнов на месяц
 pub async fn get_calendar(
     Path(board_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Query(query): Query<CalendarQuery>,
 ) -> Result<Json<CalendarResponse>, (StatusCode, String)> {
     let now = chrono::Utc::now();
@@ -110,10 +110,10 @@ pub async fn get_calendar(
         FROM cards c
         INNER JOIN lists l ON c.list_id = l.id
         INNER JOIN boards b ON l.board_id = b.id
-        WHERE l.board_id = ?
+        WHERE l.board_id = $1
           AND c.due_date IS NOT NULL
-          AND c.due_date >= ?
-          AND c.due_date <= ?
+          AND c.due_date >= $2
+          AND c.due_date <= $3
         ORDER BY c.due_date, c.id
         "#,
     )
@@ -194,7 +194,7 @@ pub async fn get_calendar(
 /// Получить карточки на конкретный день
 pub async fn get_cards_for_day(
     Path((board_id, year, month, day)): Path<(i64, i32, u32, u32)>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
 ) -> Result<Json<Vec<CalendarCard>>, (StatusCode, String)> {
     let start_timestamp = chrono::NaiveDate::from_ymd_opt(year, month, day)
         .expect("Некорректная дата начала дня")
@@ -221,10 +221,10 @@ pub async fn get_cards_for_day(
         FROM cards c
         INNER JOIN lists l ON c.list_id = l.id
         INNER JOIN boards b ON l.board_id = b.id
-        WHERE l.board_id = ? 
+        WHERE l.board_id = $1 
           AND c.due_date IS NOT NULL
-          AND c.due_date >= ? 
-          AND c.due_date <= ?
+          AND c.due_date >= $2 
+          AND c.due_date <= $3
         ORDER BY c.due_date, c.id
         "#,
     )

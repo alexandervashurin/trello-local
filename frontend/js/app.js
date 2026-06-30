@@ -19,7 +19,6 @@ import { loadSessions, deleteSession, deleteAllSessions, logoutAllSessions, open
 import { exportBoardToJson, exportBoardToCsv, getBoardStats, closeBoardStats } from './modules/export.js';
 import { toggleBulkModeFromModule, toggleCardSelectionFromModule, bulkMoveCards, bulkUpdateCards, bulkDeleteCards, bulkMarkDone, bulkMarkTodo } from './modules/bulk-ops.js';
 import { 
-  loadBoards, renderBoards, createBoard, openBoard, deleteBoard, 
   loadBoardDetails, loadBoardLists, createList, deleteList, createCard,
   openCard, showCardModal, saveCardFromModal, closeCardModal
 } from './modules/boards.js';

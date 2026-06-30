@@ -12,12 +12,12 @@ use oauth2::{
     basic::BasicClient, reqwest::async_http_client, AuthUrl, AuthorizationCode, ClientId,
     ClientSecret, CsrfToken, RedirectUrl, Scope, TokenResponse, TokenUrl,
 };
-use sqlx::SqlitePool;
+use sqlx::PgPool;
 use uuid::Uuid;
 
 /// Получить URL для авторизации GitHub
 pub async fn github_auth_url(
-    State(_pool): State<SqlitePool>,
+    State(_pool): State<PgPool>,
 ) -> Result<Json<OAuthUrl>, (StatusCode, String)> {
     let client_id = std::env::var("GITHUB_CLIENT_ID").map_err(|_| {
         (
@@ -53,7 +53,7 @@ pub async fn github_auth_url(
 
 /// Callback для GitHub OAuth
 pub async fn github_callback(
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Query(params): Query<OAuthCallback>,
 ) -> Result<Redirect, (StatusCode, String)> {
     let client_id = std::env::var("GITHUB_CLIENT_ID").map_err(|_| {
@@ -104,7 +104,7 @@ pub async fn github_callback(
         Ok(user_info) => {
             // Проверяем, есть ли уже такой OAuth аккаунт
             let existing_oauth: Option<(i64,)> = sqlx::query_as(
-                "SELECT user_id FROM oauth_accounts WHERE provider = 'github' AND provider_user_id = ?",
+                "SELECT user_id FROM oauth_accounts WHERE provider = 'github' AND provider_user_id = $1",
             )
             .bind(&user_info.provider_user_id)
             .fetch_optional(&pool)
@@ -117,7 +117,7 @@ pub async fn github_callback(
             } else {
                 // Создаём нового пользователя или связываем с существующим по email
                 let existing_user: Option<(i64,)> =
-                    sqlx::query_as("SELECT id FROM users WHERE email = ?")
+                    sqlx::query_as("SELECT id FROM users WHERE email = $1")
                         .bind(user_info.email.clone().unwrap_or_default())
                         .fetch_optional(&pool)
                         .await
@@ -127,7 +127,7 @@ pub async fn github_callback(
                 if let Some((uid,)) = existing_user {
                     // Привязываем OAuth к существующему пользователю
                     let _ = sqlx::query(
-                        "INSERT INTO oauth_accounts (user_id, provider, provider_user_id, access_token) VALUES (?, ?, ?, ?)",
+                        "INSERT INTO oauth_accounts (user_id, provider, provider_user_id, access_token) VALUES ($1, $2, $3, $4)",
                     )
                     .bind(uid)
                     .bind("github")
@@ -143,7 +143,7 @@ pub async fn github_callback(
                         .clone()
                         .unwrap_or_else(|| format!("user_{}", user_info.provider_user_id));
                     let result = sqlx::query_as::<_, (i64,)>(
-                        "INSERT INTO users (username, email, oauth_enabled) VALUES (?, ?, 1) RETURNING id",
+                        "INSERT INTO users (username, email, oauth_enabled) VALUES ($1, $2, TRUE) RETURNING id",
                     )
                     .bind(&username)
                     .bind(user_info.email.clone().unwrap_or_default())
@@ -153,7 +153,7 @@ pub async fn github_callback(
                     match result {
                         Ok((uid,)) => {
                             let _ = sqlx::query(
-                                "INSERT INTO oauth_accounts (user_id, provider, provider_user_id, access_token) VALUES (?, ?, ?, ?)",
+                                "INSERT INTO oauth_accounts (user_id, provider, provider_user_id, access_token) VALUES ($1, $2, $3, $4)",
                             )
                             .bind(uid)
                             .bind("github")
@@ -173,7 +173,7 @@ pub async fn github_callback(
 
             // Получаем информацию о пользователе для токена
             let user_info_result: Option<(String,)> =
-                sqlx::query_as("SELECT username FROM users WHERE id = ?")
+                sqlx::query_as("SELECT username FROM users WHERE id = $1")
                     .bind(user_id)
                     .fetch_optional(&pool)
                     .await
@@ -208,7 +208,7 @@ pub async fn github_callback(
 
 /// Получить URL для авторизации Google
 pub async fn google_auth_url(
-    State(_pool): State<SqlitePool>,
+    State(_pool): State<PgPool>,
 ) -> Result<Json<OAuthUrl>, (StatusCode, String)> {
     let client_id = std::env::var("GOOGLE_CLIENT_ID").map_err(|_| {
         (
@@ -246,7 +246,7 @@ pub async fn google_auth_url(
 
 /// Callback для Google OAuth
 pub async fn google_callback(
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Query(params): Query<OAuthCallback>,
 ) -> Result<Redirect, (StatusCode, String)> {
     let client_id = std::env::var("GOOGLE_CLIENT_ID").map_err(|_| {
@@ -297,7 +297,7 @@ pub async fn google_callback(
         Ok(user_info) => {
             // Проверяем, есть ли уже такой OAuth аккаунт
             let existing_oauth: Option<(i64,)> = sqlx::query_as(
-                "SELECT user_id FROM oauth_accounts WHERE provider = 'google' AND provider_user_id = ?",
+                "SELECT user_id FROM oauth_accounts WHERE provider = 'google' AND provider_user_id = $1",
             )
             .bind(&user_info.provider_user_id)
             .fetch_optional(&pool)
@@ -310,7 +310,7 @@ pub async fn google_callback(
             } else {
                 // Создаём нового пользователя или связываем с существующим по email
                 let existing_user: Option<(i64,)> =
-                    sqlx::query_as("SELECT id FROM users WHERE email = ?")
+                    sqlx::query_as("SELECT id FROM users WHERE email = $1")
                         .bind(user_info.email.clone().unwrap_or_default())
                         .fetch_optional(&pool)
                         .await
@@ -319,7 +319,7 @@ pub async fn google_callback(
 
                 if let Some((uid,)) = existing_user {
                     let _ = sqlx::query(
-                        "INSERT INTO oauth_accounts (user_id, provider, provider_user_id, access_token) VALUES (?, ?, ?, ?)",
+                        "INSERT INTO oauth_accounts (user_id, provider, provider_user_id, access_token) VALUES ($1, $2, $3, $4)",
                     )
                     .bind(uid)
                     .bind("google")
@@ -333,7 +333,7 @@ pub async fn google_callback(
                         .name
                         .unwrap_or_else(|| format!("user_{}", user_info.provider_user_id));
                     let result = sqlx::query_as::<_, (i64,)>(
-                        "INSERT INTO users (username, email, oauth_enabled) VALUES (?, ?, 1) RETURNING id",
+                        "INSERT INTO users (username, email, oauth_enabled) VALUES ($1, $2, TRUE) RETURNING id",
                     )
                     .bind(&username)
                     .bind(user_info.email.clone().unwrap_or_default())
@@ -343,7 +343,7 @@ pub async fn google_callback(
                     match result {
                         Ok((uid,)) => {
                             let _ = sqlx::query(
-                                "INSERT INTO oauth_accounts (user_id, provider, provider_user_id, access_token) VALUES (?, ?, ?, ?)",
+                                "INSERT INTO oauth_accounts (user_id, provider, provider_user_id, access_token) VALUES ($1, $2, $3, $4)",
                             )
                             .bind(uid)
                             .bind("google")
@@ -362,7 +362,7 @@ pub async fn google_callback(
             };
 
             let user_info_result: Option<(String,)> =
-                sqlx::query_as("SELECT username FROM users WHERE id = ?")
+                sqlx::query_as("SELECT username FROM users WHERE id = $1")
                     .bind(user_id)
                     .fetch_optional(&pool)
                     .await

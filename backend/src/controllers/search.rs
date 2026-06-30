@@ -4,7 +4,7 @@ use axum::{
     Json,
 };
 use serde::Deserialize;
-use sqlx::SqlitePool;
+use sqlx::PgPool;
 
 /// Параметры поиска карточек
 #[derive(Deserialize, Default)]
@@ -53,7 +53,7 @@ type CardSearchRow = (
 /// Поиск карточек на доске
 pub async fn search_cards_on_board(
     Path(board_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Query(query): Query<CardSearchQuery>,
 ) -> Result<Json<Vec<CardSearchResult>>, (StatusCode, String)> {
     // Построение запроса в зависимости от параметров
@@ -72,7 +72,7 @@ pub async fn search_cards_on_board(
             FROM cards c
             INNER JOIN lists l ON c.list_id = l.id
             INNER JOIN boards b ON l.board_id = b.id
-            WHERE l.board_id = ?
+            WHERE l.board_id = $1
             ORDER BY c.position, c.id
             "#,
         )
@@ -91,7 +91,7 @@ pub async fn search_cards_on_board(
             FROM cards c
             INNER JOIN lists l ON c.list_id = l.id
             INNER JOIN boards b ON l.board_id = b.id
-            WHERE l.board_id = ? AND (c.title LIKE ? OR c.content LIKE ?)
+            WHERE l.board_id = $1 AND (c.title LIKE $2 OR c.content LIKE $3)
             ORDER BY c.position, c.id
             "#,
         )
@@ -111,24 +111,30 @@ pub async fn search_cards_on_board(
             FROM cards c
             INNER JOIN lists l ON c.list_id = l.id
             INNER JOIN boards b ON l.board_id = b.id
-            WHERE l.board_id = ?
+            WHERE l.board_id = $1
             "#,
         );
 
+        let mut param_idx = 2;
+
         if query.done.is_some() {
-            sql.push_str(" AND c.done = ?");
+            sql.push_str(&format!(" AND c.done = ${}", param_idx));
+            param_idx += 1;
         }
 
         if query.label_color.is_some() {
-            sql.push_str(
-                " AND EXISTS (SELECT 1 FROM labels lbl WHERE lbl.card_id = c.id AND lbl.color = ?)",
-            );
+            sql.push_str(&format!(
+                " AND EXISTS (SELECT 1 FROM labels lbl WHERE lbl.card_id = c.id AND lbl.color = ${})",
+                param_idx
+            ));
+            param_idx += 1;
         }
 
         if query.label_name.is_some() {
-            sql.push_str(
-                " AND EXISTS (SELECT 1 FROM labels lbl WHERE lbl.card_id = c.id AND lbl.name = ?)",
-            );
+            sql.push_str(&format!(
+                " AND EXISTS (SELECT 1 FROM labels lbl WHERE lbl.card_id = c.id AND lbl.name = ${})",
+                param_idx
+            ));
         }
 
         sql.push_str(" ORDER BY c.position, c.id");
@@ -172,7 +178,7 @@ pub async fn search_cards_on_board(
 
         // Загружаем метки для карточки
         let labels: Vec<(i64, String, String)> =
-            sqlx::query_as("SELECT id, name, color FROM labels WHERE card_id = ?")
+            sqlx::query_as("SELECT id, name, color FROM labels WHERE card_id = $1")
                 .bind(card_id)
                 .fetch_all(&pool)
                 .await
@@ -205,7 +211,7 @@ pub async fn search_cards_on_board(
 /// Получить все метки на доске (для фильтра)
 pub async fn get_board_labels(
     Path(board_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
 ) -> Result<Json<Vec<LabelInfo>>, (StatusCode, String)> {
     let labels: Vec<(i64, String, String)> = sqlx::query_as(
         r#"
@@ -213,7 +219,7 @@ pub async fn get_board_labels(
         FROM labels lbl
         INNER JOIN cards c ON lbl.card_id = c.id
         INNER JOIN lists l ON c.list_id = l.id
-        WHERE l.board_id = ?
+        WHERE l.board_id = $1
         ORDER BY lbl.color, lbl.name
         "#,
     )
@@ -236,7 +242,7 @@ pub async fn get_board_labels(
 
 /// Быстрый поиск карточек по всем доскам (глобальный поиск)
 pub async fn global_card_search(
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Query(query): Query<CardSearchQuery>,
 ) -> Result<Json<Vec<CardSearchResult>>, (StatusCode, String)> {
     let search_pattern = query.q.map(|q| format!("%{}%", q));
@@ -254,7 +260,7 @@ pub async fn global_card_search(
             WHERE (b.visibility = 'public' OR b.owner_id = 1 OR EXISTS (
                 SELECT 1 FROM board_members bm WHERE bm.board_id = b.id AND bm.user_id = 1
             ))
-            AND (c.title LIKE ? OR c.content LIKE ?)
+            AND (c.title LIKE $1 OR c.content LIKE $2)
             ORDER BY b.title, l.title, c.position, c.id LIMIT 50
             "#,
         )
@@ -288,7 +294,7 @@ pub async fn global_card_search(
         let card_id = row.0;
 
         let labels: Vec<(i64, String, String)> =
-            sqlx::query_as("SELECT id, name, color FROM labels WHERE card_id = ?")
+            sqlx::query_as("SELECT id, name, color FROM labels WHERE card_id = $1")
                 .bind(card_id)
                 .fetch_all(&pool)
                 .await

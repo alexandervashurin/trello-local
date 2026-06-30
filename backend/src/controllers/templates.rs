@@ -8,15 +8,15 @@ use axum::{
     Json,
 };
 use serde::Deserialize;
-use sqlx::SqlitePool;
+use sqlx::PgPool;
 
 /// Получить все шаблоны пользователя
 pub async fn get_templates(
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<Vec<BoardTemplate>>, (StatusCode, String)> {
     let templates: Vec<BoardTemplate> = sqlx::query_as(
-        "SELECT id, user_id, title, description, is_public, created_at FROM board_templates WHERE user_id = ? ORDER BY created_at DESC",
+        "SELECT id, user_id, title, description, is_public, created_at FROM board_templates WHERE user_id = $1 ORDER BY created_at DESC",
     )
     .bind(claims.user_id)
     .fetch_all(&pool)
@@ -29,12 +29,12 @@ pub async fn get_templates(
 /// Получить шаблон с списками и карточками
 pub async fn get_template(
     Path(template_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<BoardTemplateWithLists>, (StatusCode, String)> {
     // Проверка прав доступа
     let template: BoardTemplate = sqlx::query_as(
-        "SELECT id, user_id, title, description, is_public, created_at FROM board_templates WHERE id = ? AND (user_id = ? OR is_public = 1)",
+        "SELECT id, user_id, title, description, is_public, created_at FROM board_templates WHERE id = $1 AND (user_id = $2 OR is_public = TRUE)",
     )
     .bind(template_id)
     .bind(claims.user_id)
@@ -44,7 +44,7 @@ pub async fn get_template(
 
     // Получаем списки
     let lists: Vec<TemplateList> = sqlx::query_as(
-        "SELECT id, template_id, title, position FROM board_template_lists WHERE template_id = ? ORDER BY position",
+        "SELECT id, template_id, title, position FROM board_template_lists WHERE template_id = $1 ORDER BY position",
     )
     .bind(template_id)
     .fetch_all(&pool)
@@ -55,7 +55,7 @@ pub async fn get_template(
     let mut lists_with_cards = Vec::new();
     for list in lists {
         let cards: Vec<TemplateCard> = sqlx::query_as(
-            "SELECT id, list_id, title, content, position FROM board_template_cards WHERE list_id = ? ORDER BY position",
+            "SELECT id, list_id, title, content, position FROM board_template_cards WHERE list_id = $1 ORDER BY position",
         )
         .bind(list.id)
         .fetch_all(&pool)
@@ -85,13 +85,13 @@ pub async fn get_template(
 /// Создать шаблон из существующей доски
 pub async fn create_template_from_board(
     Path(board_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
     Json(payload): Json<CreateBoardTemplate>,
 ) -> Result<Json<BoardTemplate>, (StatusCode, String)> {
     // Проверка прав на доску
     let has_access: Option<(i64,)> =
-        sqlx::query_as("SELECT 1 FROM boards WHERE id = ? AND owner_id = ?")
+        sqlx::query_as("SELECT 1 FROM boards WHERE id = $1 AND owner_id = $2")
             .bind(board_id)
             .bind(claims.user_id)
             .fetch_optional(&pool)
@@ -105,7 +105,7 @@ pub async fn create_template_from_board(
     // Создаём шаблон
     let is_public = payload.is_public.unwrap_or(false);
     let template: BoardTemplate = sqlx::query_as(
-        "INSERT INTO board_templates (user_id, title, description, is_public) VALUES (?, ?, ?, ?) RETURNING *",
+        "INSERT INTO board_templates (user_id, title, description, is_public) VALUES ($1, $2, $3, $4) RETURNING *",
     )
     .bind(claims.user_id)
     .bind(&payload.title)
@@ -117,7 +117,7 @@ pub async fn create_template_from_board(
 
     // Копируем списки
     let lists: Vec<(i64, String, i64)> = sqlx::query_as(
-        "SELECT id, title, position FROM lists WHERE board_id = ? ORDER BY position",
+        "SELECT id, title, position FROM lists WHERE board_id = $1 ORDER BY position",
     )
     .bind(board_id)
     .fetch_all(&pool)
@@ -126,7 +126,7 @@ pub async fn create_template_from_board(
 
     for (list_id, list_title, list_position) in lists {
         let new_list_id: i64 = sqlx::query_scalar(
-            "INSERT INTO board_template_lists (template_id, title, position) VALUES (?, ?, ?) RETURNING id",
+            "INSERT INTO board_template_lists (template_id, title, position) VALUES ($1, $2, $3) RETURNING id",
         )
         .bind(template.id)
         .bind(&list_title)
@@ -137,7 +137,7 @@ pub async fn create_template_from_board(
 
         // Копируем карточки
         let cards: Vec<(String, Option<String>, i64)> = sqlx::query_as(
-            "SELECT title, content, position FROM cards WHERE list_id = ? ORDER BY position",
+            "SELECT title, content, position FROM cards WHERE list_id = $1 ORDER BY position",
         )
         .bind(list_id)
         .fetch_all(&pool)
@@ -146,7 +146,7 @@ pub async fn create_template_from_board(
 
         for (card_title, card_content, card_position) in cards {
             let _: Result<i64, _> = sqlx::query_scalar(
-                "INSERT INTO board_template_cards (list_id, title, content, position) VALUES (?, ?, ?, ?)",
+                "INSERT INTO board_template_cards (list_id, title, content, position) VALUES ($1, $2, $3, $4)",
             )
             .bind(new_list_id)
             .bind(&card_title)
@@ -163,10 +163,10 @@ pub async fn create_template_from_board(
 /// Удалить шаблон
 pub async fn delete_template(
     Path(template_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<()>, (StatusCode, String)> {
-    let result = sqlx::query("DELETE FROM board_templates WHERE id = ? AND user_id = ?")
+    let result = sqlx::query("DELETE FROM board_templates WHERE id = $1 AND user_id = $2")
         .bind(template_id)
         .bind(claims.user_id)
         .execute(&pool)
@@ -183,13 +183,13 @@ pub async fn delete_template(
 /// Создать доску из шаблона
 pub async fn apply_template(
     Path(template_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
     Json(payload): Json<ApplyTemplateRequest>,
 ) -> Result<Json<TemplateApplyResult>, (StatusCode, String)> {
     // Проверка прав на шаблон
     let template: BoardTemplate = sqlx::query_as(
-        "SELECT id, user_id, title, description, is_public FROM board_templates WHERE id = ? AND (user_id = ? OR is_public = 1)",
+        "SELECT id, user_id, title, description, is_public FROM board_templates WHERE id = $1 AND (user_id = $2 OR is_public = TRUE)",
     )
     .bind(template_id)
     .bind(claims.user_id)
@@ -202,7 +202,7 @@ pub async fn apply_template(
         .title
         .unwrap_or_else(|| format!("{} (копия)", template.title));
     let board_id: i64 = sqlx::query_scalar(
-        "INSERT INTO boards (title, owner_id, is_shared) VALUES (?, ?, 0) RETURNING id",
+        "INSERT INTO boards (title, owner_id, is_shared) VALUES ($1, $2, FALSE) RETURNING id",
     )
     .bind(&board_title)
     .bind(claims.user_id)
@@ -212,7 +212,7 @@ pub async fn apply_template(
 
     // Добавляем владельца как участника
     let _ =
-        sqlx::query("INSERT INTO board_members (board_id, user_id, role) VALUES (?, ?, 'owner')")
+        sqlx::query("INSERT INTO board_members (board_id, user_id, role) VALUES ($1, $2, 'owner')")
             .bind(board_id)
             .bind(claims.user_id)
             .execute(&pool)
@@ -220,7 +220,7 @@ pub async fn apply_template(
 
     // Получаем списки шаблона
     let template_lists: Vec<(i64, String, i64)> = sqlx::query_as(
-        "SELECT id, title, position FROM board_template_lists WHERE template_id = ? ORDER BY position",
+        "SELECT id, title, position FROM board_template_lists WHERE template_id = $1 ORDER BY position",
     )
     .bind(template_id)
     .fetch_all(&pool)
@@ -233,7 +233,7 @@ pub async fn apply_template(
     // Копируем списки и карточки
     for (template_list_id, list_title, list_position) in template_lists {
         let new_list_id: i64 = sqlx::query_scalar(
-            "INSERT INTO lists (board_id, title, position) VALUES (?, ?, ?) RETURNING id",
+            "INSERT INTO lists (board_id, title, position) VALUES ($1, $2, $3) RETURNING id",
         )
         .bind(board_id)
         .bind(&list_title)
@@ -246,7 +246,7 @@ pub async fn apply_template(
 
         // Копируем карточки
         let cards: Vec<(String, Option<String>, i64)> = sqlx::query_as(
-            "SELECT title, content, position FROM board_template_cards WHERE list_id = ? ORDER BY position",
+            "SELECT title, content, position FROM board_template_cards WHERE list_id = $1 ORDER BY position",
         )
         .bind(template_list_id)
         .fetch_all(&pool)
@@ -255,7 +255,7 @@ pub async fn apply_template(
 
         for (card_title, card_content, card_position) in cards {
             let _ = sqlx::query_scalar::<_, i64>(
-                "INSERT INTO cards (list_id, title, content, position) VALUES (?, ?, ?, ?)",
+                "INSERT INTO cards (list_id, title, content, position) VALUES ($1, $2, $3, $4)",
             )
             .bind(new_list_id)
             .bind(&card_title)

@@ -6,19 +6,19 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use sqlx::SqlitePool;
+use sqlx::PgPool;
 
 /// Получить все комментарии к карточке
 pub async fn get_comments(
     Path(card_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
 ) -> Result<Json<Vec<CommentWithUser>>, (StatusCode, String)> {
     let comments: Vec<CommentWithUser> = sqlx::query_as(
         r#"
         SELECT c.id, c.card_id, c.user_id, c.content, c.created_at, u.username
         FROM comments c
         JOIN users u ON c.user_id = u.id
-        WHERE c.card_id = ?
+        WHERE c.card_id = $1
         ORDER BY c.created_at ASC
         "#,
     )
@@ -33,16 +33,16 @@ pub async fn get_comments(
 /// Добавить комментарий к карточке
 pub async fn create_comment(
     Path(card_id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
     Json(payload): Json<CreateComment>,
 ) -> Result<Json<CommentWithUser>, (StatusCode, String)> {
     let comment: CommentWithUser = sqlx::query_as(
         r#"
         INSERT INTO comments (card_id, user_id, content)
-        VALUES (?, ?, ?)
+        VALUES ($1, $2, $3)
         RETURNING id, card_id, user_id, content, created_at, 
-            (SELECT username FROM users WHERE id = ?) as username
+            (SELECT username FROM users WHERE id = $4) as username
         "#,
     )
     .bind(card_id)
@@ -59,7 +59,7 @@ pub async fn create_comment(
 /// Обновить комментарий
 pub async fn update_comment(
     Path(id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
     Json(payload): Json<UpdateComment>,
 ) -> Result<Json<CommentWithUser>, (StatusCode, String)> {
@@ -69,7 +69,7 @@ pub async fn update_comment(
         SELECT c.id, c.card_id, c.user_id, c.content, c.created_at, u.username
         FROM comments c
         JOIN users u ON c.user_id = u.id
-        WHERE c.id = ?
+        WHERE c.id = $1
         "#,
     )
     .bind(id)
@@ -95,7 +95,7 @@ pub async fn update_comment(
 
     let updated: CommentWithUser = sqlx::query_as(
         r#"
-        UPDATE comments SET content = ? WHERE id = ?
+        UPDATE comments SET content = $1 WHERE id = $2
         RETURNING id, card_id, user_id, content, created_at,
             (SELECT username FROM users WHERE id = user_id) as username
         "#,
@@ -112,12 +112,12 @@ pub async fn update_comment(
 /// Удалить комментарий
 pub async fn delete_comment(
     Path(id): Path<i64>,
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<()>, (StatusCode, String)> {
     // Проверяем, что комментарий принадлежит пользователю
     let comment_user_id: Option<i64> =
-        sqlx::query_scalar("SELECT user_id FROM comments WHERE id = ?")
+        sqlx::query_scalar("SELECT user_id FROM comments WHERE id = $1")
             .bind(id)
             .fetch_one(&pool)
             .await
@@ -136,7 +136,7 @@ pub async fn delete_comment(
         _ => {}
     }
 
-    let result = sqlx::query("DELETE FROM comments WHERE id = ?")
+    let result = sqlx::query("DELETE FROM comments WHERE id = $1")
         .bind(id)
         .execute(&pool)
         .await

@@ -5,36 +5,15 @@ use axum::{
     response::Response,
 };
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
-use sqlx::SqlitePool;
+use sqlx::PgPool;
 
 use crate::controllers::sessions;
+use crate::jwt::get_jwt_secret;
 use crate::views::Claims;
-
-/// Получение JWT secret из переменной окружения
-/// В production среде JWT_SECRET должен быть установлен обязательно
-fn get_jwt_secret() -> Vec<u8> {
-    std::env::var("JWT_SECRET")
-        .inspect_err(|_| {
-            tracing::warn!(
-                "JWT_SECRET не установлен! Используйте уникальное значение в production"
-            );
-        })
-        .unwrap_or_else(|_| {
-            // Генерируем случайный секрет только для разработки
-            // В production это должно вызывать ошибку
-            use std::time::{SystemTime, UNIX_EPOCH};
-            let seed = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("Время не может идти вспять")
-                .as_nanos();
-            format!("dev-secret-{}", seed)
-        })
-        .into_bytes()
-}
 
 /// Извлечение Claims из запроса
 pub async fn extract_claims(
-    State(pool): State<SqlitePool>,
+    State(pool): State<PgPool>,
     mut request: Request,
     next: Next,
 ) -> Result<Response, (StatusCode, String)> {
@@ -69,7 +48,7 @@ pub async fn extract_claims(
 
             match decode::<Claims>(
                 token,
-                &DecodingKey::from_secret(&get_jwt_secret()),
+                &DecodingKey::from_secret(get_jwt_secret()),
                 &Validation::new(Algorithm::HS256),
             ) {
                 Ok(token_data) => {
@@ -124,7 +103,7 @@ pub async fn extract_claims(
 
 /// Middleware для обязательной аутентификации
 pub async fn require_auth(
-    State(_pool): State<SqlitePool>,
+    State(_pool): State<PgPool>,
     request: Request,
     next: Next,
 ) -> Result<Response, (StatusCode, String)> {

@@ -1,6 +1,6 @@
 // backend/src/models/backup.rs
 use serde::{Deserialize, Serialize};
-use sqlx::sqlite::SqliteRow;
+use sqlx::postgres::PgRow;
 use sqlx::{FromRow, Row};
 
 #[derive(Serialize, FromRow, Clone, Debug)]
@@ -35,8 +35,8 @@ pub struct BackupList {
     pub creator_username: String,
 }
 
-impl<'r> FromRow<'r, SqliteRow> for BackupList {
-    fn from_row(row: &'r SqliteRow) -> Result<Self, sqlx::Error> {
+impl<'r> FromRow<'r, PgRow> for BackupList {
+    fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
         Ok(Self {
             id: row.try_get("id")?,
             filename: row.try_get("filename")?,
